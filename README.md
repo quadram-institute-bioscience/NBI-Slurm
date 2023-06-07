@@ -1,6 +1,8 @@
 # NBI-Slurm
 
-![NBI Slurm mousey](docs/one-mouse.svg)
+[![Ubuntu_18](https://github.com/quadram-institute-bioscience/NBI-Slurm/actions/workflows/main.yml/badge.svg)](https://github.com/quadram-institute-bioscience/NBI-Slurm/actions/workflows/main.yml)
+
+<img align="right" src="docs/one-mouse.svg"  width="256">
 
 ## New Batch Interface for SLURM
 
