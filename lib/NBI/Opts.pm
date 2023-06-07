@@ -14,39 +14,7 @@ my $SYSTEM_TEMPDIR = $ENV{'TMPDIR'} || $ENV{'TEMP'} || "/tmp";
 require Exporter;
 our @ISA = qw(Exporter);
 
-
-=head1 SYNOPSIS
-
-SLURM Options for C<NBI::Slurm> .
-
-=over 4
-
-=item B<name>
-
-The actual sequence, the only mandatory field (string)
  
-
-=back
-
-  use NBI::Job;
-  my $opts = new(
-     -queue => "short",
-     -threads => 4,
-     -memory => 8,
-     -opts  => ["--output=TestJob.out", "--mail-user user@nmsu.edu"],
-  );
-
-
-=head1 MAIN METHODS 
-
-=head2 new()
-
-Create a new instance of C<NBI::Seq>.
-The sequence is the only required field.
-
-
-=cut
-
 sub new {
     my $class = shift @_;
     my ($queue, $memory, $threads, $opts_array, $tmpdir, $hours, $email_address, $email_when) = (undef, undef, undef, undef, undef, undef, undef);
@@ -69,9 +37,9 @@ sub new {
                 $memory = _mem_parse_mb($data{$i});
             } elsif ($i =~ /^-tmpdir/) {
                 $memory = $data{$i};
-            } elsif ($i =~ /^-mail/) {
+            } elsif ($i =~ /^-(mail|email_address)/) {
                 $email_address = $data{$i};
-            } elsif ($i =~ /^-when/) {
+            } elsif ($i =~ /^-(when|email_type)/) {
                 $email_when = $data{$i};
             } elsif ($i =~ /^-opts/) {
                 # in this case we expect an array

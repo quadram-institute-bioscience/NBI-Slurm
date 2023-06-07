@@ -5,20 +5,32 @@
 use v5.12;
 use warnings;
 use Getopt::Long;
+use FindBin qw($RealBin);
+use Data::Dumper;
+$Data::Dumper::Sortkeys = 1;
+if (-e "$RealBin/../dist.ini") {
+    use lib "$RealBin/../lib";
+} 
+
 use NBI::Slurm;
 
-use FindBin qw($RealBin);
+
+
 use Cwd;
 
+my $user_home_dir = $ENV{HOME};
 my $user_current_dir = getcwd();
 my $username = $ENV{USER};
-
-my $queue = 'qib-short,nbi-short';
+my $config = load_config("$user_home_dir/.nbislurm.config");
+my $version = $NBI::Slurm::VERSION;
+my $queue = $config->{'queue'} // 'qib-short,nbi-short';
 my $threads = 1;
 my $memory = 8000;
 my $time = 8;
 my $tmpdir = "/tmp";
 my $name;
+my $email_address = $config->{'email'} // undef;
+my $mail_type = $config->{'email_type'} // "none";
 my $command;
 my $verbose;
 my $run;
@@ -30,22 +42,30 @@ GetOptions(
     'T|tmpdir=s' => \$tmpdir,
     'n|name=s' => \$name,
     'r|run' => \$run,
+    'a|email-address=s' => \$email_address,
+    'm|mail-type=s' => \$mail_type, # 'BEGIN,END,FAIL,REQUEUE,ALL'
     'verbose' => \$verbose,
     'help' => sub { usage() },
 );
 
+# Update queue based on time
+$queue = update_queue($queue, $time);
 $command = join(" ", @ARGV);
 $name = autoname($command) unless (defined $name);
+
 my $opts = NBI::Opts->new(
     -queue => $queue,
     -threads => $threads,
     -memory => $memory,
     -time   => $time,
-    -tmpdir => $tmpdir
+    -tmpdir => $tmpdir,
+    -email_address => $email_address,
+    -email_type => $mail_type,
 
 );
 
 if ($verbose) {
+    say STDERR "CONFIG:\n", Dumper($config);
     say STDERR $opts->view();
 }
 
@@ -71,8 +91,8 @@ if ($run) {
 
 sub usage {
     say STDERR <<END;
-
- NBI Slurm queuer
+ ----------------------------------------------------------
+  NBI Slurm queuer $version
  ----------------------------------------------------------
  runjob [options] "Command to run"
 
@@ -88,6 +108,7 @@ sub usage {
     --help           This help message
  ----------------------------------------------------------
 END
+    exit;
 }
 
 sub autoname {
@@ -102,6 +123,50 @@ sub autoname {
     }
 }
 
+sub load_config {
+    my $filename = shift;
+    my $config = {};
+    if (! -e "$filename") {
+        say STDERR "Config file not found: $filename";
+        return $config;
+    }
+    open(my $fh, "<", $filename) or die "Cannot open $filename: $!";
+    while (<$fh>) {
+        chomp;
+        next if (/^\s*$/);
+        next if (/^#/);
+        next if (/^;/);
+        my ($key, $value) = split(/=/, $_);
+        # discard keys with spaces
+        next if ($key =~ /\s/);
+        $config->{$key} = $value;
+    }
+    close  $fh;
+    return $config;
+}
+
+sub update_queue {
+    my ($queue, $time) = @_;
+    # If the queue has a star, it can be updated
+    if ($queue !~ /\*/) {
+        return $queue;
+    }
+    # Get time in hours
+    my $mock_opt = NBI::Opts->new(-time => $time);
+    my $time_h = $mock_opt->hours;
+    
+    if ($time <= 2 ) {
+        # Replace * with short
+        $queue =~ s/\*/short/g;
+    } elsif ($time_h <= 24) {
+        # Replace * with medium
+        $queue =~ s/\*/medium/g;
+    } else {
+        # Replace * with long
+        $queue =~ s/\*/long/g;
+    }
+    return $queue;
+}
 __END__
 =head1 SYNOPSIS
 
@@ -123,6 +188,7 @@ Specifies the name of the job (optional). If not provided, an automatic name wil
 =item B<-q, --queue>
 
 Specifies the queue name for the job. The default value is "nbi-short".
+Note that if you put a "*", it will be replaced by 'short', 'medium', or 'long' depending on the time specified with '--time'.
 
 =item B<-m, --memory>
 
@@ -153,6 +219,13 @@ Enables verbose output, displaying additional information about the job and its 
 Displays the help message for the script.
 
 =back
+
+=head1 CONFIGURATION
+
+The script will look for a configuration file in the user's home directory at C<~/.nbislurm.config>.
+
+  queue=qib-*,nbi-*
+  email=my@address
 
 =head1 EXAMPLES
 

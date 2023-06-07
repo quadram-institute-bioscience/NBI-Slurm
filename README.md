@@ -1,5 +1,7 @@
 # NBI-Slurm
 
+![NBI Slurm mousey](docs/one-mouse.svg)
+
 ## New Batch Interface for SLURM
 
 `NBI::Slurm` is a Perl package that provides a convenient interface for submitting jobs to SLURM, 
