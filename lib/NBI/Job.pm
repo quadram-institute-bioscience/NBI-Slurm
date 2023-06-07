@@ -90,7 +90,8 @@ sub new {
     
 
     $self->{name} = defined $job_name ? $job_name : 'job-' . int(rand(1000000));
-
+    $self->{jobid} = 0;
+    
     # Commands: if both commands_array and command are defined, append command to commands_array
     if (defined $commands_array) {
         $self->{commands} = $commands_array;
@@ -125,6 +126,16 @@ sub name : lvalue {
     my ($self, $new_val) = @_;
     $self->{name} = $new_val if (defined $new_val);
     return $self->{name};
+}
+
+sub jobid : lvalue {
+    # Update jobid
+    my ($self, $new_val) = @_;
+    if (defined $new_val and $new_val !~ /^-?(\d+)$/) {
+        confess "ERROR NBI::Job: jobid must be an integer ". $new_val ."\n";
+    }
+    $self->{jobid} = $new_val if (defined $new_val);
+    return $self->{jobid};
 }
 
 sub outputfile : lvalue {
@@ -217,34 +228,27 @@ sub script {
 
     # Add the commands
     $script .= join("\n", @{$self->{commands}});
-    return $header . $script;
-END_SCRIPT
+    
+    
     # Add the commands
     $script .= join("\n", @{$self->{commands}});
-    return $script;
+    return $header . $script;
 
 }
+
 sub run {
     my $self = shift @_;
-    # Check it has some commands
-    if ($self->commands_count == 0) {
-        confess "ERROR NBI::Job: No commands defined for job " . $self->name . "\n";
+        # Check it has some commands
+    
+ 
+    # Check it has a queue
+    if (not defined $self->opts->queue) {
+        confess "ERROR NBI::Job: No queue defined for job " . $self->name . "\n";
     }
     # Check it has some opts
     if (not defined $self->opts) {
         confess "ERROR NBI::Job: No opts defined for job " . $self->name . "\n";
     }
-    # Check it has a queue
-    if (not defined $self->opts->queue) {
-        confess "ERROR NBI::Job: No queue defined for job " . $self->name . "\n";
-    }
-    
-    # Create the script
-    
-}
-
-sub run {
-    my $self = shift @_;
     # Check it has some commands
     if ($self->commands_count == 0) {
         confess "ERROR NBI::Job: No commands defined for job " . $self->name . "\n";
@@ -260,6 +264,11 @@ sub run {
     close($fh);
 
     # Run the script
+
+    if (_has_command('sbatch') == 0) {
+        $self->jobid = -1;
+        return 0;
+    }
     my $job_output = `sbatch "$script_file"`;
 
     # Check the output
@@ -273,6 +282,23 @@ sub run {
         # Job not submitted
         confess "ERROR NBI::Job: Job " . $self->name . " not submitted\n";
     }
+    return $self->jobid;
+}
+
+
+sub _has_command {
+    my $command = shift;
+    my $is_available = 0;
+    
+    if ($^O eq 'MSWin32') {
+        # Windows system
+        $is_available = system("where $command >nul 2>nul") == 0;
+    } else {
+        # Unix-like system
+        $is_available = system("command -v $command >/dev/null 2>&1") == 0;
+    }
+    
+    return $is_available;
 }
 
 sub _to_string {

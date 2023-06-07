@@ -213,6 +213,7 @@ sub header {
         $str .= "#SBATCH --mail-user=" . $self->{email_address} . "\n";
         $str .= "#SBATCH --mail-type=" . $self->{email_type} . "\n";
     }
+    return $str;
 }
 
 sub timestring {
