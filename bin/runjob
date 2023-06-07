@@ -1,5 +1,6 @@
 #!/usr/bin/env perl
 #ABSTRACT: Run a job in the cluster using NBI::Slurm
+#PODNAME: runjob
 
 use v5.12;
 use warnings;
