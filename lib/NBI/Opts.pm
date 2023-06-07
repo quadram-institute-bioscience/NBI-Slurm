@@ -286,3 +286,181 @@ sub _time_to_hour {
 
 
 1;
+
+__END__
+
+=pod
+
+=head1 SYNOPSIS
+
+SLURM Options for L<NBI::Slurm>, to be passed to a L<NBI::Job> object.
+
+  use NBI::Opts;
+  my $opts = NBI::Opts->new(
+   -queue => "short",
+   -threads => 4,
+   -memory => 8,
+   -opts => []
+  );
+
+=head1 DESCRIPTION
+
+The C<NBI::Opts> module provides a class for representing the SLURM options used by L<NBI::Slurm> for job submission. 
+It allows you to set various options such as the queue, number of threads, allocated memory, execution time, and more.
+
+=head1 METHODS
+
+=head2 new()
+
+Create a new instance of CNBI::Opts.
+
+
+  my $opts = NBI::Opts->new(
+    -queue => "short",
+    -threads => 4,
+    -memory => 8,
+    -opts  => ["--option=Value"],
+  );
+
+This method creates a new C<NBI::Opts> object with the specified options. The following parameters are supported:
+
+=over 4
+
+=item * B<-queue> (string, optional)
+
+The SLURM queue to submit the job to. If not provided, the default queue will be used.
+
+=item * B<-threads> (integer, optional)
+
+The number of threads to allocate for the job. If not provided, the default value is 1.
+
+=item * B<-memory> (string or integer (Mb), optional)
+
+The allocated memory for the job. It can be specified as a bare number representing megabytes (e.g., 1024), or with a unit suffix (e.g., 1GB). If not provided, the default value is 100 megabytes.
+
+=item * B<-opts> (arrayref, optional)
+
+An array reference containing additional SLURM options to be passed to the job script. Each option should be specified as a string. For example, ["--output=TestJob.out", "--mail-user user@nmsu.edu"]. If not provided, no additional options will be added.
+
+B<NOTE> that some options are set by other methods (like C<output_file> and C<email_address>): do not specify them manually.
+
+=back
+
+=head2 queue
+
+Accessor method for the SLURM queue.
+
+
+  $opts->queue = "long";
+  my $queue = $opts->queue;
+
+This method allows you to get or set the SLURM queue for the job. If called with an argument, it sets the queue to the specified value. If called without an argument, it returns the current queue value.
+
+=head2 threads
+
+Accessor method for the number of threads.
+
+  $opts->threads = 8;
+  my $threads = $opts->threads;
+
+This method allows you to get or set the number of threads allocated for the job. If called with an argument, it sets the number of threads to the specified value. If called without an argument, it returns the current number of threads.
+
+=head2 memory
+
+Accessor method for the allocated memory.
+
+
+  $opts->memory = 16;
+  my $memory = $opts->memory;
+
+This method allows you to get or set the allocated memory for the job. If called with an argument, it sets the memory to the specified value. If called without an argument, it returns the current allocated memory.
+
+=head2 email_address
+
+Accessor method for the email address.
+
+
+  $opts->email_address = "user@example.com";
+  my $email_address = $opts->email_address;
+
+This method allows you to get or set the email address to which job notifications will be sent. If called with an argument, it sets the email address to the specified value. If called without an argument, it returns the current email address.
+
+=head2 email_type
+
+Accessor method for the email type.
+
+
+  $opts->email_type = "end";
+  my $email_type = $opts->email_type;
+
+This method allows you to get or set the type of email notifications to receive. Possible values are "none" (no email notifications), "begin" (send email at the start of the job), "end" (send email at the end of the job), or "all" (send email for all job events). If called with an argument, it sets the email type to the specified value. If called without an argument, it returns the current email type.
+
+=head2 hours
+
+Accessor method for the execution time in hours.
+
+
+  $opts->hours = 24;
+  my $hours = $opts->hours;
+
+This method allows you to get or set the execution time for the job in hours. If called with an argument, it sets the execution time to the specified value. If called without an argument, it returns the current execution time.
+
+=head2 tmpdir
+
+Accessor method for the temporary directory.
+
+
+  $opts->tmpdir = "/path/to/tmpdir";
+  my $tmpdir = $opts->tmpdir;
+
+This method allows you to get or set the temporary directory path where temporary files for the job will be stored. If called with an argument, it sets the temporary directory to the specified value. If called without an argument, it returns the current temporary directory.
+
+=head2 opts
+
+Accessor method for the additional SLURM options.
+
+
+  $opts->opts = ["--output=TestJob.out", "--mail-user user@nmsu.edu"];
+  my $opts_array = $opts->opts;
+
+This method allows you to get or set the additional SLURM options for the job. The options should be specified as an array reference, where each element is a string representing a single option. If called with an argument, it sets the additional options to the specified array reference. If called without an argument, it returns the current additional options.
+
+=head2 add_option
+
+Add an additional SLURM option.
+
+  $opts->add_option("--output=TestJob.out");
+
+This method allows you to add an additional SLURM option to the options list.
+
+=head2 opts_count
+
+Get the number of additional SLURM options.
+
+  my $count = $opts->opts_count;
+
+This method returns the number of additional SLURM options specified for the job.
+
+=head2 view
+
+Get a string representation of the options.
+
+  my $str = $opts->view;
+
+This method returns a string representation of the CNBI::Opts object, including all the options and their values.
+
+=head2 header
+
+Generate the SLURM header for the job script.
+
+  my $header = $opts->header;
+
+This method generates the SLURM header for the job script based on the current options and returns it as a string.
+
+=head2 timestring
+
+Get the execution time as a formatted string.
+
+  my $timestring = $opts->timestring;
+
+This method returns the execution time as a formatted string in the format "DD-HH:MM:SS", where "DD" is the number of days, "HH" is the number of hours (in 2 digits), "MM" is the number of minutes, and "SS" is the number of seconds.

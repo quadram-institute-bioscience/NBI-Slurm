@@ -8,6 +8,8 @@ use FindBin qw($RealBin);
 use lib "$RealBin/../lib";
 use NBI::Slurm;
 
+my $user_current_dir = `pwd`;
+chomp $user_current_dir;
 my $opt = NBI::Opts->new(
     -queue => "nbi-short",
     -threads => 1,
@@ -18,13 +20,16 @@ my $opt = NBI::Opts->new(
 
 my $job = NBI::Job->new(
     -name => "my-job",
-    -command => "ls -l > temporary-example-list.txt",
+    -command => "cd $user_current_dir",
     -opts => $opt
 );
+$job->append_command("ls -l > temporary-example-list.txt");
 
+say "-------- JOB DUMP --------";
 say Dumper $job;    
-
+say "-------- JOB SCRIPT --------";
 say $job->script();
+say "-------- /JOB  --------";
 if (my $j = $job->run()) {
     say "Job submitted: $j";
 } else {
