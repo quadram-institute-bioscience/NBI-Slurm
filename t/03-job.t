@@ -11,7 +11,7 @@ my $job = NBI::Job->new(-name => "my-job");
 print Dumper($job);
 ok($job->name eq "my-job", "Job name is my-job: " . $job->name);
 
-$job = NBI::Job->new(-name => "my-command", -command => "ls -l");
+$job = NBI::Job->new(-name => "my-command", -command => "pwd");
 
 ok($job->commands_count == 1, "Job has 1 command: " . $job->commands_count);
 

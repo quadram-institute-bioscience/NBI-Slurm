@@ -5,6 +5,7 @@ use 5.012;
 use warnings;
 use Carp qw(confess);
 use Data::Dumper;
+use File::Spec::Functions;
 $Data::Dumper::Sortkeys = 1;
 use File::Basename;
 
@@ -126,6 +127,28 @@ sub name : lvalue {
     return $self->{name};
 }
 
+sub outputfile : lvalue {
+    # Update name
+    my ($self, $new_val) = @_;
+    $self->{output_file} = $new_val if (defined $new_val);
+    if (not defined $self->{output_file}) {
+        $self->{output_file} = catfile( $self->opts->tmpdir , $self->name . ".%j.out");
+    } else {
+        return $self->{output_file};
+    }
+}
+
+sub errorfile : lvalue {
+    # Update name
+    my ($self, $new_val) = @_;
+    $self->{error_file} = $new_val if (defined $new_val);
+    if (not defined $self->{error_file}) {
+        $self->{error_file} =  catfile($self->opts->tmpdir, $self->name . ".%j.err");
+    } else {
+        return $self->{error_file};
+    }
+    
+}
 sub append_command {
     my ($self, $new_command) = @_;
     push @{$self->{commands}}, $new_command;
@@ -175,37 +198,26 @@ sub script {
     my ($self) = @_;
     
     my $template = [
-    '#!/bin/bash',
-    '#SBATCH -p NBI_SLURM_QUEUE',
-    '#SBATCH -t NBI_SLURM_DAYS-NBI_SLURM_HOURS:00',
-    '#SBATCH -c NBI_SLURM_CORES',
-    '#SBATCH --mem=NBI_SLURM_MEMMB',
-    '#SBATCH -N NBI_SLURM_NODES',
     '#SBATCH -J NBI_SLURM_JOBNAME',
-    '#SBATCH --mail-type=NBI_SLURM_MAILTYPE',
-    '#SBATCH --mail-user=NBI_SLURM_MAILADDR',
     '#SBATCH -o NBI_SLURM_OUT',
-    '#SBATCH -e NBI_SLURM_ERR'
+    '#SBATCH -e NBI_SLURM_ERR',
+    ''
     ];
-
+    my $header = $self->opts->header();
     # Replace the template
     my $script = join("\n", @{$template});
     # Replace the values
-    $script =~ s/NBI_SLURM_QUEUE/$self->opts->queue/g;
-    $script =~ s/NBI_SLURM_DAYS/$self->opts->days/g;
-    $script =~ s/NBI_SLURM_HOURS/$self->opts->hours/g;
-    $script =~ s/NBI_SLURM_CORES/$self->opts->threads/g;
-    $script =~ s/NBI_SLURM_MEMMB/$self->opts->memory/g;
-    $script =~ s/NBI_SLURM_NODES/1/g;
-    $script =~ s/NBI_SLURM_JOBNAME/$self->name/g;
-    $script =~ s/NBI_SLURM_MAILTYPE/$self->opts->mail_type/g;
-    $script =~ s/NBI_SLURM_MAILADDR/$self->opts->mail_user/g;
-    $script =~ s/NBI_SLURM_OUT/$self->outputfile/g;
-    $script =~ s/NBI_SLURM_ERR/$self->errorfile/g;
+    
+    my $name = $self->name;
+    my $file_out = $self->outputfile;
+    my $file_err = $self->errorfile;
+    $script =~ s/NBI_SLURM_JOBNAME/$name/g;
+    $script =~ s/NBI_SLURM_OUT/$file_out/g;
+    $script =~ s/NBI_SLURM_ERR/$file_err/g;
 
     # Add the commands
     $script .= join("\n", @{$self->{commands}});
-    return $script;
+    return $header . $script;
 END_SCRIPT
     # Add the commands
     $script .= join("\n", @{$self->{commands}});
@@ -229,5 +241,43 @@ sub run {
     
     # Create the script
     
+}
+
+sub run {
+    my $self = shift @_;
+    # Check it has some commands
+    if ($self->commands_count == 0) {
+        confess "ERROR NBI::Job: No commands defined for job " . $self->name . "\n";
+    }
+
+    # Create the script
+    my $script = $self->script();
+
+    # Create the script file
+    my $script_file = catfile($self->opts->tmpdir, $self->name . ".sh");
+    open(my $fh, ">", $script_file) or confess "ERROR NBI::Job: Cannot open file $script_file for writing\n";
+    print $fh $script;
+    close($fh);
+
+    # Run the script
+    my $job_output = `sbatch "$script_file"`;
+
+    # Check the output
+    if ($job_output =~ /Submitted batch job (\d+)/) {
+        # Job submitted
+        my $job_id = $1;
+        # Update the job id
+        $self->{job_id} = $job_id;
+        return $job_id;
+    } else {
+        # Job not submitted
+        confess "ERROR NBI::Job: Job " . $self->name . " not submitted\n";
+    }
+}
+
+sub _to_string {
+    # Convert string to a sanitized string with alphanumeric chars and dashes
+    my ($self, $string) = @_;
+    return $string =~ s/[^a-zA-Z0-9\-]//gr; 
 }
 1;
