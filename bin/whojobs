@@ -1,0 +1,78 @@
+#!/usr/bin/env perl
+#ABSTRACT: List the users with jobs, and the number of jobs in the cluster
+#PODNAME: whojobs
+
+use v5.12;
+use warnings;
+use Getopt::Long;
+use FindBin qw($RealBin);
+use Data::Dumper;
+use Term::ANSIColor qw(:constants);
+$Data::Dumper::Sortkeys = 1;
+
+if (-e "$RealBin/../dist.ini") {
+    say STDERR "[dev mode] Using local lib";
+    use lib "$RealBin/../lib";
+} 
+
+use NBI::Slurm;
+use Cwd;
+our $user_max = 14;
+my $unix_users = unix_users();
+my $slurm_users = slurm_users();
+my $all_users = {};
+
+for my $user (@{$unix_users}) {
+    $slurm_users->{$user} = 0;
+}
+my $opt_user = $ENV{USER};
+
+my $c = 0;
+for my $user (sort {$$slurm_users{$a} <=> $$slurm_users{$b}}keys %{$slurm_users}) {
+    $c++;
+    my $star = ($user eq $opt_user) ? '*' : '';
+    # Dedicate 40 chars to user, 10 to jobs, 10 to star
+    if ($c % 2 == 0) {
+        print BOLD;
+    } else {
+        print RESET;
+    }
+    printf "%-${user_max}s %5s %2s\n", $user, $slurm_users->{$user}, $star;
+}
+print RESET;
+sub unix_users {
+    my $cmd = "who | cut -d' ' -f1";
+    my @users  = `$cmd`;
+    chomp @users;
+    # Remove 'USER'
+    shift @users;
+    # Sort uniq
+    @users = sort { $a cmp $b } @users;
+    my %seen = ();
+    @users = grep { ! $seen{ $_ }++ } @users;
+
+    return \@users;    
+}
+sub slurm_users {
+    my $cmd = "squeue --format='%u'";
+    my @users  = `$cmd`;
+    chomp @users;
+    # Remove 'USER'
+    shift @users;
+    # Sort uniq
+    @users = sort { $a cmp $b } @users;
+    
+
+    # Return a hash user -> times seen
+    my %seen = ();
+    @users = grep { ! $seen{ $_ }++ } @users;
+    
+    return \%seen;
+}
+
+
+sub get_terminal_width {
+    my $terminal_width = `tput cols`;
+    chomp($terminal_width);
+    return $terminal_width > 20 ? $terminal_width : 80;
+}

@@ -1,6 +1,6 @@
 # NBI-Slurm
 
-<img align="right" src="docs/one-mouse.svg"  width="256">
+<img align="right" src="docs/one-mouse.svg"  width="128">
 
 [![Ubuntu_18](https://github.com/quadram-institute-bioscience/NBI-Slurm/actions/workflows/main.yml/badge.svg)](https://github.com/quadram-institute-bioscience/NBI-Slurm/actions/workflows/main.yml)
 

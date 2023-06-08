@@ -8,14 +8,13 @@ use Getopt::Long;
 use FindBin qw($RealBin);
 use Data::Dumper;
 $Data::Dumper::Sortkeys = 1;
+
 if (-e "$RealBin/../dist.ini") {
+    say STDERR "[dev mode] Using local lib";
     use lib "$RealBin/../lib";
 } 
 
 use NBI::Slurm;
-
-
-
 use Cwd;
 
 my $user_home_dir = $ENV{HOME};
@@ -26,7 +25,7 @@ my $version = $NBI::Slurm::VERSION;
 my $queue = $config->{'queue'} // 'qib-short,nbi-short';
 my $threads = 1;
 my $memory = 8000;
-my $time = 8;
+my $time = 2;
 my $tmpdir = "/tmp";
 my $name;
 my $email_address = $config->{'email'} // undef;
@@ -51,6 +50,8 @@ GetOptions(
 # Update queue based on time
 $queue = update_queue($queue, $time);
 $command = join(" ", @ARGV);
+usage() unless ( $command);
+
 $name = autoname($command) unless (defined $name);
 
 my $opts = NBI::Opts->new(

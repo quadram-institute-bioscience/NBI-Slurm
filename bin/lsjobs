@@ -1,0 +1,199 @@
+#!/usr/bin/env perl
+#ABSTRACT: List the jobs, and delete them
+#PODNAME: lsjobs
+
+use v5.12;
+use warnings;
+use Getopt::Long;
+use FindBin qw($RealBin);
+use Data::Dumper;
+$Data::Dumper::Sortkeys = 1;
+
+if (-e "$RealBin/../dist.ini") {
+    say STDERR "[dev mode] Using local lib";
+    use lib "$RealBin/../lib";
+} 
+
+use NBI::Slurm;
+use Cwd;
+
+
+
+my $jobs = getjobs();
+
+my $unix_username = $ENV{USER};
+my $user_home_dir = $ENV{HOME};
+
+my $opt_user = $unix_username;
+my $opt_status = '.+';
+my $opt_running_bool = 0;
+my $opt_pending_bool = 0;
+my $opt_delete_bool = 0;
+my $opt_verbose_bool = 0;
+my $opt_queue = '.+';
+my $opt_name = '.+';
+
+GetOptions(
+    'u|user=s' => \$opt_user,
+    'n|name=s' => \$opt_name,
+    's|status=s' => \$opt_status,
+    'r|running' => \$opt_running_bool,
+    'd|delete' => \$opt_delete_bool,
+    'verbose' => \$opt_verbose_bool,
+    'help' => sub { usage() },
+);
+my @ids = @ARGV;
+
+if ($opt_user eq 'ALL') {
+    $opt_user = '.+';
+}
+if ($opt_verbose_bool) {
+    say STDERR "User: $opt_user";
+    say STDERR "Jobs: ", scalar(keys %{$jobs});
+}
+
+my $selected_jobs = {};
+my $selected_arrays = [['Queue', 'User', 'JobID', 'Name', 'State', 'Time', 'NodeList', 'CPUS', 'Memory', 'Reason'],
+                       ['-----', '----', '-----', '----', '-----', '----', '--------', '----', '------', '------']];
+
+for my $job (sort keys %{$jobs}) {
+    # Check user (full match)
+    if ($jobs->{$job}->{USER} !~ /^$opt_user$/) {
+        next;
+    }
+    # Check queue (partial match ok)
+    if ($jobs->{$job}->{PARTITION} !~ /$opt_queue/) {
+        next;
+    }
+    # Check status
+    if ($opt_pending_bool  and $jobs->{$job}->{STATE} ne 'PENDING') {
+        next;
+    }
+    if ($opt_running_bool  and $jobs->{$job}->{STATE} ne 'RUNNING') {
+        next;
+    }
+    if (scalar @ids > 0 and not grep {$_ eq $job} @ids) {
+        next;
+    }
+    my $array = [$jobs->{$job}->{PARTITION},
+                 $jobs->{$job}->{USER},
+                 $jobs->{$job}->{JOBID},
+                 $jobs->{$job}->{NAME},
+                 $jobs->{$job}->{STATE},
+                 $jobs->{$job}->{TIME},
+                 $jobs->{$job}->{NODELIST},
+                 $jobs->{$job}->{"CPUS"},
+                 $jobs->{$job}->{"MIN_MEMORY"},
+                 $jobs->{$job}->{"REASON"},];
+    push(@{$selected_arrays}, $array); 
+
+
+}
+render_table(@{$selected_arrays});
+
+sub short_job {
+    # Print a line of minimal information about a job
+    my $line_width = get_terminal_width();
+    my $job = shift;
+    my $jobid = $job->{JOBID};
+    my $name = $job->{NAME};
+    my $state = $job->{STATE};
+    my $user = $job->{USER};
+    my $queue = $job->{PARTITION};
+    my $time = $job->{TIME};
+    # Return a string sorther than $line_width
+    my $line = sprintf("%-10s %-10s %-10s %-10s %-10s %-10s", $jobid, $name, $state, $user, $queue, $time);
+    return $line;
+}
+
+sub render_table {
+    # Receive a list of lists (all same length) and print a table not larger than $line_width
+    
+    # @_ is an array of array references
+    my @rows = @_;
+    my $n_cols = scalar(@{$rows[0]});
+    my $line_width = get_terminal_width() - $n_cols - 1;
+    # For each column, evaluate the maximum string contained in that column
+    my @max_widths = ();
+    for my $col (0..$n_cols-1) {
+        my $max_width = 0;
+        for my $row (@rows) {
+            my $width = length($row->[$col]);
+            $max_width = $width if ($width > $max_width);
+        }
+        push(@max_widths, $max_width);
+    }
+    # Now print the table
+    for my $row (@rows) {
+        my $line = "";
+        for my $col (0..$n_cols-1) {
+            my $width = $max_widths[$col];
+            my $cell = $row->[$col];
+            $line .= sprintf("|%-${width}s ", $cell);
+        }
+        say $line, "|";
+    }
+}
+sub getjobs {
+    # Create an anonymous hash, and return it
+    my $jobs = {};
+    my $cmd = q(squeue --format='%all');
+    my @output = `$cmd`;
+    my $c = 0;
+    my @header = ();
+    for my $line (@output) {
+        chomp $line;
+
+        my @fields = split(/\|/, $line);
+        $c++;
+        if ($c == 1 ) {
+            # Field names
+            for my $field (@fields) {
+                push(@header, stripchars($field));
+            }
+        } else {
+            # Job info
+            my $job = {};
+            if (scalar(@fields) != scalar(@header)) {
+                say STDERR "Error: number of fields in header and line do not match";
+                say STDERR "Header: ", scalar(@header);
+                say STDERR "Line: ", scalar(@fields);
+                say STDERR "Line: $line";
+                exit;
+            }
+            for my $i (0..$#header) {
+                $job->{"$header[$i]"} = $fields[$i] if (not defined $job->{"$header[$i]"});
+            }
+
+            $jobs->{$job->{JOBID}} = $job;
+            
+        }
+        
+    }
+    
+    return $jobs;
+}
+
+
+sub get_terminal_width {
+    my $terminal_width = `tput cols`;
+    chomp($terminal_width);
+    return $terminal_width > 20 ? $terminal_width : 80;
+}
+
+sub stripchars {
+    my $string = shift;
+    # replace non alphanumeric characters with _
+    $string =~ s/[^A-Za-z0-9]/_/g;
+    return $string;
+}
+
+sub prompt {
+    my ($message, $default) = @_;
+    my $prompt = "$message [$default]: ";
+    print $prompt;
+    my $answer = <STDIN>;
+    chomp $answer;
+    $answer = $default if ($answer eq '');
+    return $answer;
+}

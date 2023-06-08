@@ -15,41 +15,6 @@ require Exporter;
 our @ISA = qw(Exporter);
 
 
-=head1 SYNOPSIS
-
-A job object supported from C<NBI::Slurm> .
-
-=over 4
-
-=item B<name>
-
-The actual sequence, the only mandatory field (string)
- 
-
-=back
-
-  use NBI::Job;
-  my $job = new(
-    -name => "job-name",
-    -command => "ls -l",
-  );
-
-  # Multi commands
-    my $job = new(
-    -name => "job-name",
-    -commands => ["ls -l", "echo done"]
-  );
-
-=head1 MAIN METHODS 
-
-=head2 new()
-
-Create a new instance of C<NBI::Seq>.
-The sequence is the only required field.
-
-
-=cut
-
 sub new {
     my $class = shift @_;
     my ($job_name, $commands_array, $command, $opts);
@@ -443,9 +408,8 @@ This method allows you to set the options for the job using an instance of the C
 
 Get the options for the job.
 
-perl
 
-my $opts = $job->get_opts;
+  my $opts = $job->get_opts;
 
 This method returns the options for the job as an instance of the CNBI::Opts class.
 
