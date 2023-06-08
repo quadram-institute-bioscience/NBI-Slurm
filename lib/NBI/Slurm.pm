@@ -3,7 +3,7 @@ use strict;
 use warnings;
 package NBI::Slurm;
 
-$NBI::Slurm::VERSION = '0.1.2';
+$NBI::Slurm::VERSION = '0.2.0';
 
 use NBI::Job;
 use NBI::Opts;

@@ -7,6 +7,7 @@ use warnings;
 use Getopt::Long;
 use FindBin qw($RealBin);
 use Data::Dumper;
+use Term::ANSIColor qw(:constants);
 $Data::Dumper::Sortkeys = 1;
 
 if (-e "$RealBin/../dist.ini") {
@@ -42,7 +43,20 @@ GetOptions(
     'verbose' => \$opt_verbose_bool,
     'help' => sub { usage() },
 );
-my @ids = @ARGV;
+
+my @ids = ();
+for my $positional (@ARGV) {
+    if ($positional =~ /^(\d+)$/) {
+        push(@ids, $1);
+    } else {
+        if ($opt_name eq '.+') {
+            $opt_name = $positional;
+        } else {
+            say STDERR "Error: unknown positional argument: $positional";
+            usage();
+        }
+    }
+}
 
 if ($opt_user eq 'ALL') {
     $opt_user = '.+';
@@ -63,6 +77,11 @@ for my $job (sort keys %{$jobs}) {
     }
     # Check queue (partial match ok)
     if ($jobs->{$job}->{PARTITION} !~ /$opt_queue/) {
+        next;
+    }
+
+    # Check name
+    if ($jobs->{$job}->{NAME} !~ /$opt_name/) {
         next;
     }
     # Check status
@@ -91,6 +110,37 @@ for my $job (sort keys %{$jobs}) {
 }
 render_table(@{$selected_arrays});
 
+my @selected_ids = joblist_to_ids(@{$selected_arrays});
+
+
+if ($opt_delete_bool and scalar @selected_ids) {
+    say RED "\nDELETE JOBS:", RESET;
+    if (prompt("Delete " . scalar(@selected_ids) . " jobs?", 'n') =~ /^(y|Y|yes|YES)$/) {
+        my $command = "scancel " . join(" ", @selected_ids);
+        system($command);
+        if ($? == -1) {
+            say RED, "ERROR", RESET ": Failed to delete: $!\n";
+        }
+    } 
+
+}
+
+sub joblist_to_ids {
+    # Receive a list of lists (all same length) and returns a list of jobids
+    my @rows = @_;
+    my @ids = ();
+    # remove first two rows
+    
+    for my $row (@rows) {
+        # Skip non numeric values
+        next if ($row->[2] !~ /^\d+$/);
+        push @ids, $row->[2];
+       
+    }
+
+    return @ids;
+    
+}
 sub short_job {
     # Print a line of minimal information about a job
     my $line_width = get_terminal_width();
@@ -197,3 +247,109 @@ sub prompt {
     $answer = $default if ($answer eq '');
     return $answer;
 }
+
+sub usage {
+    say <<END;
+  Usage: lsjobs [options] [jobid ... | pattern ]
+  ----------------------------------------------
+  Options:
+   -u, --user <username>       : Show only jobs from this user [default: $unix_username]
+   -n, --name <pattern>        : Show only jobs with this name [default: .+]
+  
+   -s, --status <pattern>      : Show only jobs with this status [default: .+]
+   -r, --running               : Show only running jobs
+   -p, --pending               : Show only pending jobs
+
+   -d, --delete                : Delete the selected jobs
+   --verbose                   : Show verbose output
+END
+    exit;
+
+}
+
+__END__
+
+=pod
+
+=head1 SYNOPSIS
+
+  lsjobs [options] [jobid ... | pattern]
+
+=head1 DESCRIPTION
+
+This script lists the jobs and provides the option to delete them. 
+It allows filtering the jobs based on various criteria such as user, name, and status.
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<-u, --user <username>>
+
+Show only jobs from the specified user. Default: current user.
+
+=item B<-n, --name <pattern>>
+
+Show only jobs with the specified name pattern. Default: .+ (matches any name).
+
+=item B<-s, --status <pattern>>
+
+Show only jobs with the specified status pattern. Default: .+ (matches any status).
+
+=item B<-r, --running>
+
+Show only running jobs.
+
+=item B<-d, --delete>
+
+Delete the selected jobs. This option must be used with caution, but an interactive prompt is provided
+
+=item B<--verbose>
+
+Display verbose output.
+
+=item B<--help>
+
+Print the help message and exit.
+
+=back
+
+=head1 ARGUMENTS
+
+=over 4
+
+=item B<jobid ... | pattern>
+
+Optional. Specify either job IDs (many) or a pattern (single) to filter the jobs based on their names.
+
+=back
+
+=head1 EXAMPLES
+
+=over 4
+
+=item B<Example 1:>
+
+List all jobs:
+
+  lsjobs
+
+=item B<Example 2:>
+
+List jobs with the name "myjob":
+
+  lsjobs -n myjob
+
+=item B<Example 3:>
+
+List running jobs of a specific user:
+
+  lsjobs -r -u username
+
+=item B<Example 4:>
+
+Delete some of my jobs (only pending, and with name containing MEGAHIT):
+
+  lsjobs -d --pending MEGAHIT 
+
+=back

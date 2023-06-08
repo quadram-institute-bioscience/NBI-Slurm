@@ -42,7 +42,7 @@ GetOptions(
     'n|name=s' => \$name,
     'r|run' => \$run,
     'a|email-address=s' => \$email_address,
-    'm|mail-type=s' => \$mail_type, # 'BEGIN,END,FAIL,REQUEUE,ALL'
+    'e|mail-type=s' => \$mail_type, # 'BEGIN,END,FAIL,REQUEUE,ALL'
     'verbose' => \$verbose,
     'help' => sub { usage() },
 );

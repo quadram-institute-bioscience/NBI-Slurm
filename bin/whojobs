@@ -8,6 +8,7 @@ use Getopt::Long;
 use FindBin qw($RealBin);
 use Data::Dumper;
 use Term::ANSIColor qw(:constants);
+use Cwd;
 $Data::Dumper::Sortkeys = 1;
 
 if (-e "$RealBin/../dist.ini") {
@@ -15,8 +16,15 @@ if (-e "$RealBin/../dist.ini") {
     use lib "$RealBin/../lib";
 } 
 
+my ($opt_color, $opt_no_color, $opt_min_jobs, $opt_verbose);
+GetOptions(
+    'n|no-color' => \$opt_no_color,
+    'm|min-jobs=i' => \$opt_min_jobs,
+    'v|verbose' => \$opt_verbose,
+);
+my $opt_pattern = shift;
 use NBI::Slurm;
-use Cwd;
+
 our $user_max = 14;
 my $unix_users = unix_users();
 my $slurm_users = slurm_users();
@@ -28,18 +36,45 @@ for my $user (@{$unix_users}) {
 my $opt_user = $ENV{USER};
 
 my $c = 0;
+my $p = 0;
 for my $user (sort {$$slurm_users{$a} <=> $$slurm_users{$b}}keys %{$slurm_users}) {
     $c++;
     my $star = ($user eq $opt_user) ? '*' : '';
+    if ($opt_pattern && $user !~ /$opt_pattern/i) {
+        next;
+    }
+    if ($opt_min_jobs && $slurm_users->{$user} < $opt_min_jobs) {
+        next;
+    }
     # Dedicate 40 chars to user, 10 to jobs, 10 to star
     if ($c % 2 == 0) {
-        print BOLD;
+        if ( !$opt_no_color) {
+            print GREEN BOLD;
+        } else {
+            print RESET;
+        }
     } else {
         print RESET;
     }
-    printf "%-${user_max}s %5s %2s\n", $user, $slurm_users->{$user}, $star;
+    $p++;
+    printf "%4s %-${user_max}s %5s %2s\n", $c, $user, $slurm_users->{$user}, $star;
 }
-print RESET;
+
+# END
+
+print STDERR RESET "\n";
+if ($opt_verbose) {
+    unless ($opt_no_color) {
+        print STDERR CYAN;
+    }
+    print STDERR "Total users with jobs: ", scalar(keys %{$slurm_users}), "\n";
+    print STDERR "Total users logged:    ", scalar(@{$unix_users}), "\n";
+    print STDERR "Printed users:         $p\n", RESET;
+}
+
+END {
+    print RESET "";
+}
 sub unix_users {
     my $cmd = "who | cut -d' ' -f1";
     my @users  = `$cmd`;
@@ -76,3 +111,85 @@ sub get_terminal_width {
     chomp($terminal_width);
     return $terminal_width > 20 ? $terminal_width : 80;
 }
+
+sub usage {
+    print STDERR <<END;
+    -------------------------------------------------------------------------
+    whojobs - List the users with jobs, and the number of jobs in the cluster
+    -------------------------------------------------------------------------
+    Usage: whojobs [options] [pattern]
+
+    Options:
+        -n, --no-color         Do not use colors
+        -m, --min-jobs INT     Only show users with at least one job
+        -v, --verbose          Verbose output
+
+END
+
+    exit 0;
+}
+
+__END__
+
+=pod
+
+=head1 SYNOPSIS
+
+whojobs [options] [pattern]
+
+=head1 DESCRIPTION
+
+This script lists the users with jobs and the number of jobs they have in the cluster. 
+It provides options for filtering the output and displaying verbose information.
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<-n, --no-color>
+
+Disable color highlighting in the output.
+
+=item B<-m, --min-jobs INT>
+
+Only show users with at least the specified number of jobs.
+
+=item B<-v, --verbose>
+
+Display verbose output, including the total number of users with jobs, the total number of logged users, and the number of users printed.
+
+=back
+
+=head1 ARGUMENTS
+
+=over 4
+
+=item B<pattern>
+
+Optional. Specify a pattern to filter the users based on their names.
+
+=back
+
+=head1 EXAMPLES
+
+=over 4
+
+=item B<Example 1:>
+
+List all users with jobs:
+
+  whojobs
+
+=item B<Example 2:>
+
+List users with at least 5 jobs:
+
+  whojobs -m 5
+
+=item B<Example 3:>
+
+List users whose names contain "john":
+
+  whojobs john
+
+=back

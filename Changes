@@ -1,6 +1,9 @@
+0.3.0   2023-06-09
+ * Drafted `waitjobs`
+  
 0.2.0   2023-06-08
  * Drafted `lsjobs`, `whojobs` 
-  
+
 0.1.2   2023-06-07  
  * Added release tests
 

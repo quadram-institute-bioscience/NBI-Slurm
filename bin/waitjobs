@@ -1,0 +1,157 @@
+#!/usr/bin/env perl
+#ABSTRACT: Wait for selected jobs to exit the queue
+#PODNAME: waitjobs
+
+use v5.12;
+use warnings;
+use Getopt::Long;
+use FindBin qw($RealBin);
+use Data::Dumper;
+use Term::ANSIColor qw(:constants);
+$Data::Dumper::Sortkeys = 1;
+
+my $opt_user = $ENV{USER};
+my $opt_name = '.+';
+my $opt_status = '';
+my $opt_verbose_bool = 0;
+my $opt_debug_bool = 0;
+my $refresh_time = 20;
+# Check if this script is running as a job, in case save the job id
+my $self_job_id = $ENV{SLURM_JOB_ID} // undef;
+GetOptions(
+    'u|user=s' => \$opt_user,
+    'n|name=s' => \$opt_name,
+    'r|refresh=i' => $refresh_time,
+    'verbose' => \$opt_verbose_bool,
+    'debug' => \$opt_debug_bool,
+    'help' => sub { usage() },
+);
+
+while (1) {
+    my $jobs = getJobs($opt_user, $opt_name, $opt_status);
+    if ($jobs == 0) {
+        exit 0;
+    }
+    if ($opt_verbose_bool) {
+        say STDERR "Waiting for $jobs jobs to finish";
+    }
+    sleep $refresh_time;
+}
+sub getJobs {
+    my ($user, $name, $status) = @_;
+    my $cmd = qq(squeue);
+    if ($user) {
+        $cmd .= qq( -u $user);
+    }
+    if ($status) {
+        $status = uc($status);
+        $cmd .= qq( -t $status);
+    }
+    my @results = `$cmd`;
+
+    if ($?) {
+        say STDERR "Error: $cmd";
+        exit 1;
+    }
+
+    my $jobs = 0;
+    my $line_number = 0;
+    for my $line (@results) {
+        $line_number++;
+        next if ($line_number == 1);
+        if ($opt_debug_bool) {
+            print STDERR $line;
+        }
+        if ($self_job_id > 0 and $line =~/^\s+$self_job_id\s/) {
+            next;
+        }
+        if ($line =~ /$name/) {
+            $jobs++;
+        }
+    }
+    return $jobs;
+}
+
+sub usage {
+    say STDERR<<END;
+
+  Usage: waitjobs [options] [job_name]
+  ------------------------------------
+    Wait for selected jobs to exit the queue
+
+  Options:
+    
+END
+    exit;
+}
+__END__
+
+=pod
+
+=head1 SYNOPSIS
+
+waitjobs [options]
+
+=head1 DESCRIPTION
+
+This script waits for selected jobs to exit the queue. It continuously checks the status of the jobs and waits until all the specified jobs are completed.
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<-u, --user <username>>
+
+Specify the username to wait for jobs from. By default, it uses the current user.
+
+=item B<-n, --name <pattern>>
+
+Specify the name pattern to filter the jobs. Only jobs with matching names will be considered. The default pattern is '.+' (matches any name).
+
+=item B<-r, --refresh <time>>
+
+Specify the refresh time in seconds for checking the job status. The script will wait for this duration before checking the job status again. The default refresh time is 20 seconds.
+
+=item B<--verbose>
+
+Display verbose output, including the number of jobs being waited for.
+
+=item B<--debug>
+
+Enable debug mode, printing the output of the squeue command.
+
+=item B<--help>
+
+Print the help message and exit.
+
+=back
+
+=head1 EXAMPLES
+
+=over 4
+
+=item B<Example 1:>
+
+Wait for all your jobs with a specific name to exit the queue:
+
+  waitjobs -n myjob
+
+=item B<Example 2:>
+
+Wait for jobs from a specific user to exit the queue:
+
+  waitjobs -u username
+
+=item B<Example 3:>
+
+Wait for jobs with a specific name from a specific user:
+
+  waitjobs -u username -n myjob
+
+=item B<Example 4:>
+
+Wait for jobs with a specific status, refreshing every 10 seconds:
+
+  waitjobs -n myjob -r 10 -u username -s RUNNING
+
+=back
