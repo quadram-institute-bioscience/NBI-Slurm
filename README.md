@@ -2,10 +2,8 @@
 
 <img align="right" src="docs/one-mouse.svg"  width="128">
 
-[![Ubuntu_18](https://github.com/quadram-institute-bioscience/NBI-Slurm/actions/workflows/main.yml/badge.svg)](https://github.com/quadram-institute-bioscience/NBI-Slurm/actions/workflows/main.yml)
-
 [![MetaCpan](https://img.shields.io/cpan/v/NBI-Slurm)](https://metacpan.org/dist/NBI-Slurm)
-
+[![testers](https://img.shields.io/badge/CPAN%20Testers-status-brightgreen)](http://matrix.cpantesters.org/?dist=NBI-Slurm;maxver=1)
 
 ## New Batch Interface for SLURM
 
