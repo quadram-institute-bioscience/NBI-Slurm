@@ -10,17 +10,18 @@ use Data::Dumper;
 use Term::ANSIColor qw(:constants);
 use Cwd;
 $Data::Dumper::Sortkeys = 1;
-
 if (-e "$RealBin/../dist.ini") {
     say STDERR "[dev mode] Using local lib";
     use lib "$RealBin/../lib";
 } 
+
 
 my ($opt_color, $opt_no_color, $opt_min_jobs, $opt_verbose);
 GetOptions(
     'n|no-color' => \$opt_no_color,
     'm|min-jobs=i' => \$opt_min_jobs,
     'v|verbose' => \$opt_verbose,
+    'h|help' => sub { usage() },
 );
 my $opt_pattern = shift;
 use NBI::Slurm;

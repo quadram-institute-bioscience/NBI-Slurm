@@ -8,6 +8,12 @@ use Getopt::Long;
 use FindBin qw($RealBin);
 use Data::Dumper;
 use Term::ANSIColor qw(:constants);
+if (-e "$RealBin/../dist.ini") {
+    say STDERR "[dev mode] Using local lib";
+    use lib "$RealBin/../lib";
+} 
+use NBI::Slurm;
+use NBI::Queue;
 $Data::Dumper::Sortkeys = 1;
 
 my $opt_user = $ENV{USER};
@@ -27,50 +33,37 @@ GetOptions(
     'help' => sub { usage() },
 );
 
-while (1) {
-    my $jobs = getJobs($opt_user, $opt_name, $opt_status);
-    if ($jobs == 0) {
-        exit 0;
+my $queue = NBI::Queue->new(
+    -username => $opt_user,
+    -name => $opt_name,
+);
+# If $self_job_id is anq integer, remove it from the queue
+if (defined $self_job_id and $self_job_id =~ /^\d+$/) {
+    print STDERR "Ignoring current job id $self_job_id\n";
+    $queue->remove($self_job_id);
+}
+
+my @starting_ids = @{$queue->ids()};
+print STDERR "Starting with ", $queue->len(), " jobs for ", $opt_user, " with name matching ", $opt_name ,"\n";
+
+while (scalar @starting_ids > 0) {
+    my $current_jobs = NBI::Queue->new();
+    my @current_ids = @{$current_jobs->ids()};
+
+    # Remove from @starting_ids all the jobs that are NOT in @current_ids
+    my @new_starting_ids = ();
+    for my $starting_id (@starting_ids) {
+        if (grep {$_ eq $starting_id} @current_ids) {
+            push(@new_starting_ids, $starting_id);
+        }
     }
+    @starting_ids = @new_starting_ids;
     if ($opt_verbose_bool) {
-        say STDERR "Waiting for $jobs jobs to finish";
+        say STDERR "Waiting for ", scalar @starting_ids, " jobs to finish";
     }
     sleep $refresh_time;
 }
-sub getJobs {
-    my ($user, $name, $status) = @_;
-    my $cmd = qq(squeue);
-    if ($user) {
-        $cmd .= qq( -u $user);
-    }
-    if ($status) {
-        $status = uc($status);
-        $cmd .= qq( -t $status);
-    }
-    my @results = `$cmd`;
 
-    if ($?) {
-        say STDERR "Error: $cmd";
-        exit 1;
-    }
-
-    my $jobs = 0;
-    my $line_number = 0;
-    for my $line (@results) {
-        $line_number++;
-        next if ($line_number == 1);
-        if ($opt_debug_bool) {
-            print STDERR $line;
-        }
-        if ($self_job_id > 0 and $line =~/^\s+$self_job_id\s/) {
-            next;
-        }
-        if ($line =~ /$name/) {
-            $jobs++;
-        }
-    }
-    return $jobs;
-}
 
 sub usage {
     say STDERR<<END;
@@ -80,6 +73,9 @@ sub usage {
     Wait for selected jobs to exit the queue
 
   Options:
+   -u, --user       default current user
+   -n, --name       default '.+' (matches any name)
+   -r, --refresh    check every 20 seconds
     
 END
     exit;

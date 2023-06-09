@@ -9,7 +9,7 @@ use Test::More;
 use_ok 'NBI::Slurm';
 
 # Can I make a Job instead?
-
+# withouth importing NBI::Job
 my $job = NBI::Job->new(-name => "TestJob", -command => "echo 'Hello World'");
 
 done_testing();

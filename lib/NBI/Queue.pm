@@ -66,6 +66,13 @@ sub new {
     $self->{jobname} = $jobname // undef;
     return $self;
 }
+
+sub remove {
+    my $self = shift;
+    my $jobid = shift;
+    my @jobs = grep {$_->jobid != $jobid} @{$self->{jobs}};
+    $self->{jobs} = \@jobs;
+}
 sub _squeue {
     my ($username, $jobid, $state_short, $partitions_csv, $jobname) = @_;
     my $field_sep = ':/:';

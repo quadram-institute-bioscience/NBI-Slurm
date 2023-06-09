@@ -58,7 +58,7 @@ for my $positional (@ARGV) {
     }
 }
 
-if ($opt_user eq 'ALL') {
+if ($opt_user eq 'ALL' or $opt_user eq 'all') {
     $opt_user = '.+';
 }
 if ($opt_verbose_bool) {
@@ -253,15 +253,17 @@ sub usage {
   Usage: lsjobs [options] [jobid ... | pattern ]
   ----------------------------------------------
   Options:
-   -u, --user <username>       : Show only jobs from this user [default: $unix_username]
-   -n, --name <pattern>        : Show only jobs with this name [default: .+]
+   -u, --user <username>   Show only jobs from this user [default: $unix_username]
+                           Type 'all' to show all users
+                           
+   -n, --name <pattern>    Show only jobs with this name [default: .+]
   
-   -s, --status <pattern>      : Show only jobs with this status [default: .+]
-   -r, --running               : Show only running jobs
-   -p, --pending               : Show only pending jobs
+   -s, --status <pattern>  Show only jobs with this status [default: .+]
+   -r, --running           Show only running jobs
+   -p, --pending           Show only pending jobs
 
-   -d, --delete                : Delete the selected jobs
-   --verbose                   : Show verbose output
+   -d, --delete            Delete the selected jobs
+   --verbose               Show verbose output
 END
     exit;
 
