@@ -150,11 +150,11 @@ sub view {
     # Return a string representation of the object
     my $self = shift @_;
     my $str = " --- NBI::Opts object ---\n";
-    $str .= " queue:\t$self->{queue}\n";
-    $str .= " threads:\t$self->{threads}\n";
-    $str .= " memory MB:\t$self->{memory}\n";
-    $str .= " time (h):\t$self->{hours}\n";
-    $str .= " tmpdir:\t$self->{tmpdir}\n";
+    $str .= " queue:\t" . $self->{queue} . "\n";
+    $str .= " threads:\t" . $self->{threads} . "\n";
+    $str .= " memory MB:\t" . $self->{memory} . "\n";
+    $str .= " time (h):\t" . $self->{hours} . "\n";
+    $str .= " tmpdir:\t" . $self->{tmpdir} . "\n";
     $str .= " ---------------------------\n";
     for my $o (@{$self->{opts}}) {
         $str .= "#SBATCH $o\n";

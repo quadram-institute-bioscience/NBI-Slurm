@@ -1,5 +1,6 @@
-0.3.0   2023-06-09
+0.3.0   2023-06-10
  * Drafted `waitjobs`
+ * Drafted `NBI::Queue` to check jobs in queue, saved as `NBI::QueuedJob` objects
   
 0.2.0   2023-06-08
  * Drafted `lsjobs`, `whojobs` 

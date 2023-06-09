@@ -5,12 +5,31 @@ package NBI::Slurm;
 
 $NBI::Slurm::VERSION = '0.2.0';
 
-use NBI::Job;
-use NBI::Opts;
 
 # Export both classes
 use base qw(Exporter);
-our @EXPORT_OK = qw(NBI::Job NBI::Opts);
+our @ISA = qw(Exporter);
+
+our %FORMAT_STRINGS = (
+ 'account'    => '%a',
+ 'jobid'      => '%A',
+ 'jobname'    => '%j',
+ 'cpus'       => '%C',
+ 'end_time'   => '%E',
+ 'start_time' => '%S',
+ 'total_time' => '%l',
+ 'time_left'  => '%L',
+ 'memory'     => '%m',
+ 'command'    => '%o',
+ 'queue'      => '%P',
+ 'reason'     => '%r',
+ 'status'     => '%T', # short: %t
+ 'workdir'    => '%Z',
+ 'user'       => '%u',
+);
+our @EXPORT = qw(%FORMAT_STRINGS);
+
+
 
 
 1;

@@ -1,0 +1,144 @@
+#ABSTRACT: NBI::Queue, to filter jobs in the queue
+use strict;
+use warnings;
+package NBI::Queue;
+use Carp qw(croak confess);
+use NBI::Slurm;
+use NBI::QueuedJob;
+use Data::Dumper qw(Dumper);
+$NBI::Queue::VERSION = $NBI::Slurm::VERSION;
+
+
+
+# Export QueuedJob
+use base qw(Exporter);
+our @EXPORT = qw(NBI::QueuedJob new);
+sub new {
+    my $class = shift;
+    my $self = bless {}, $class;
+    
+
+    # -username
+    # -jobid
+    my $username;
+    my $jobid;
+    my $queue;
+    my $state_short;
+    my $partitions_csv;
+    my $jobname;
+    if (substr($_[0], 0, 1) eq '-') {
+        my %data = @_;
+        for my $i (keys %data) {
+            if ($i =~ /^-user/)  {
+                next unless defined $data{$i};
+                $username = $data{$i};
+            } elsif ($i =~ /^-jobid/)  {
+                next unless defined $data{$i};
+                if ($data{$i} =~ /^\d+$/) {
+                    $jobid = $data{$i};
+                } else {
+                    confess "ERROR NBI::Queue: -jobid expects an integer\n";
+                }
+            } elsif ($i =~ /^-queue/) {
+                next unless defined $data{$i};
+                $queue = $data{$i};
+            } elsif ($i =~ /^-state/) {
+                next unless defined $data{$i};
+                my @valid_states =  qw(PD R CG CF CA CD F TO NF SE ST RV S SO PR NF RV S SO PR);
+                if (grep {$_ eq uc($data{$i})} @valid_states) {
+                    $state_short = uc($data{$i});
+                } else {
+                    confess "ERROR NBI::Queue: -state expects one of the following values: @valid_states\n";
+                }
+            } elsif ($i =~ /^-name/) {
+                $jobname = $data{$i} if defined $data{$i};
+            } else {
+                confess "ERROR NBI::Queue: Unknown option/parameter $i\n";
+            }
+        }
+    }
+    my $jobs = _squeue($username, $jobid, $state_short, $partitions_csv, $jobname);
+    $self->{username} = $username // undef;
+    $self->{jobid} = $jobid // undef;
+    $self->{queue} = $queue // undef;
+    $self->{state_short} = $state_short // undef;
+    $self->{jobs} = $jobs;
+    $self->{jobname} = $jobname // undef;
+    return $self;
+}
+sub _squeue {
+    my ($username, $jobid, $state_short, $partitions_csv, $jobname) = @_;
+    my $field_sep = ':/:';
+    my @field_names = qw(jobid user jobname cpus memory queue status start_time end_time total_time time_left command workdir account reason);
+    my $format = join $field_sep, @field_names;
+    $format = _make_format_string($format);
+
+    # Prepare command
+    my $cmd = "squeue --format '$format' --noheader ";
+    $cmd .= " -u $username " if defined $username;
+    $cmd .= " -j $jobid " if defined $jobid;
+    $cmd .= " -t $state_short " if defined $state_short;
+    $cmd .= " -p $partitions_csv " if defined $partitions_csv;
+
+    # Prepend '-' to @field_names
+    @field_names = map { "-$_" } @field_names;
+
+    my @output = `$cmd 2>/dev/null`;
+    if ($? != 0) {
+        Carp::croak "ERROR NBI::Queue: squeue failed. Are you in a SLURM cluster?\n";
+    }
+    my @header;
+    my $c = 0;
+    my @jobs;
+    for my $line (@output) {
+        $c++;
+        chomp $line;
+        
+        my @fields = split /$field_sep/, $line;
+
+        # Make a hash of @fields_names and @fields
+        my %job;
+        @job{@field_names} = @fields;
+        
+        ## FILTER FURTHER
+        if (defined $jobname) {
+            next unless $job{-"jobname"} =~ /$jobname/;
+        }
+
+        my $submitted_job = NBI::QueuedJob->new(%job);
+
+        
+
+        push @jobs, $submitted_job;
+    }
+    return \@jobs;
+}
+
+sub len {
+    my $self = shift;
+    return scalar @{$self->{jobs}};
+}
+
+sub ids {
+    my $self = shift;
+    my @ids = map {$_->jobid} @{$self->{jobs}};
+    # If scalar
+    if (wantarray) {
+        return @ids;
+    } else {
+        return \@ids;
+    }
+}
+sub _make_format_string {
+    my $string = shift;
+    
+    for my $key (keys %NBI::Slurm::FORMAT_STRINGS) {
+        my $val = $NBI::Slurm::FORMAT_STRINGS{$key};
+        $string =~ s/$key/$val/;
+    }
+
+    return $string;
+}
+1;
+
+__END__
