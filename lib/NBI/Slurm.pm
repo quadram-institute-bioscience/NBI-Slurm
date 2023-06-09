@@ -1,14 +1,17 @@
 #ABSTRACT: NBI Slurm module
 use strict;
 use warnings;
-package NBI::Slurm;
 
+package NBI::Slurm;
+use NBI::Job;
+use NBI::Opts;
+use base qw(Exporter);
+our @ISA = qw(Exporter);
+our @EXPORT = qw(Job Opts %FORMAT_STRINGS);
 $NBI::Slurm::VERSION = '0.2.0';
 
 
-# Export both classes
-use base qw(Exporter);
-our @ISA = qw(Exporter);
+
 
 our %FORMAT_STRINGS = (
  'account'    => '%a',
@@ -27,7 +30,7 @@ our %FORMAT_STRINGS = (
  'workdir'    => '%Z',
  'user'       => '%u',
 );
-our @EXPORT = qw(%FORMAT_STRINGS);
+
 
 
 

@@ -142,3 +142,85 @@ sub _make_format_string {
 1;
 
 __END__
+
+=pod
+
+=head1 DESCRIPTION
+
+The C<NBI::Queue> module provides a mechanism to filter and manage jobs in the SLURM queue. 
+It allows you to create a queue object and retrieve information about the jobs based on various 
+criteria such as username, job ID, queue name, job state, and job name.
+Each job is represented by a L<NBI::QueuedJob> object, which provides access to the job attributes.
+
+
+=head1 SYNOPSIS
+
+  
+  use NBI::Queue;  
+
+  # Create a new Queue object  
+  my $queue = NBI::Queue->new(  
+      -username => 'username',  
+      -jobid    => 12345,  
+      -queue    => 'queue_name',  
+      -state    => 'PD',  
+      -name     => 'job_name',  
+  );  
+
+  # Access and modify object attributes  
+  $queue->username = 'new_username';  
+  $queue->state    = 'R';  
+
+  # Get the length of the queue  
+  my $length = $queue->len;  
+
+  # Get the job IDs in the queue  
+  my @job_ids = $queue->ids;
+
+
+=head1 METHODS
+
+=head2 new
+
+
+
+  my $queue = NBI::Queue->new(%options);
+
+Creates a new C<NBI::Queue> object with the specified options. 
+The options should be provided as a hash, using the following keys:
+
+=over 4
+
+=item C<-username>
+
+Filter jobs by username.
+
+=item C<-jobid>
+
+Filter jobs by job ID.
+
+=item C<-queue>
+
+Filter jobs by queue name.
+
+=item C<-state>
+
+Filter jobs by job state (e.g., PD, R, CG, CF).
+
+=item C<-name>
+
+Filter jobs by job name.
+
+=back
+
+=head2 len
+
+  my $length = $queue->len;
+
+Returns the length (number of jobs) in the queue.
+
+=head2 ids
+
+  my @job_ids = $queue->ids;
+
+Returns an array or array reference (depending on the context) containing the job IDs in the queue.

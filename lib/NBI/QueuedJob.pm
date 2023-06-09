@@ -117,3 +117,113 @@ sub status : lvalue {
     return $self->{status};
 }
 1;
+
+__END__
+
+=head1 DESCRIPTION
+
+The C<NBI::QueuedJob> module provides a representation of a job from the SLURM queue (squeue).
+It allows you to create job objects and access their attributes. 
+
+It is used by L<NBI::Queue> to describe the jobs in the queue.
+
+=head1 SYNOPSIS
+
+  
+  use NBI::QueuedJob;  
+
+  # Create a new QueuedJob object  
+  my $job = NBI::QueuedJob->new(  
+      -user   => 'username',  
+      -jobid  => 12345,  
+      -queue  => 'queue_name',  
+      -status => 'RUNNING',  
+      -name   => 'job_name',  
+      -attr1  => 'value1',  
+      -attr2  => 'value2',  
+  );  
+
+  # Access and modify object attributes  
+  $job->username = 'new_username';  
+  $job->status   = 'COMPLETED';  
+
+  # Get attribute values  
+  my $jobid  = $job->jobid;  
+  my $status = $job->status;
+
+
+=head1 METHODS
+
+=head2 new
+
+
+  my $job = NBI::QueuedJob->new(%options);
+
+Creates a new C<NBI::QueuedJob> object with the specified options.
+The options should be provided as a hash, using the following keys:
+
+=over 4
+
+=item C<-user>
+
+The username associated with the job.
+
+=item C<-jobid>
+
+The job ID.
+
+=item C<-queue>
+
+The name of the queue in which the job is running.
+
+=item C<-status>
+
+The status of the job.
+
+=item C<-name>
+
+The name of the job (pattern)
+
+
+=back
+
+=head2 username
+
+
+
+  $job->username = 'new_username';
+  my $username = $job->username;
+
+Accessor for the C<username> attribute of the job.
+
+=head2 jobid
+
+
+  $job->jobid = 54321;
+  my $jobid = $job->jobid;
+
+Accessor for the C<jobid> attribute of the job.
+
+=head2 queue
+ 
+
+  $job->queue = 'new_queue';
+  my $queue = $job->queue;
+
+Accessor for the C<queue> attribute of the job.
+
+=head2 status
+
+
+
+  $job->status = 'COMPLETED';
+  my $status = $job->status;
+
+Accessor for the C<status> attribute of the job.
+
+=head2 name
+
+  $job->name = 'new_name';
+  my $name = $job->name;
+
+Accessor for the C<name> attribute of the job.
