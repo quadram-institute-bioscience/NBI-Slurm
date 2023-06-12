@@ -1,43 +1,39 @@
 # NBI-Slurm
 
-<img align="right" src="docs/one-mouse.svg"  width="128">
+<a href="https://metacpan.org/dist/NBI-Slurm"><img align="right" src="docs/one-mouse.svg"  width="128"></a>
 
 [![MetaCpan](https://img.shields.io/cpan/v/NBI-Slurm)](https://metacpan.org/dist/NBI-Slurm)
 [![testers](https://img.shields.io/badge/CPAN%20Testers-status-brightgreen)](http://matrix.cpantesters.org/?dist=NBI-Slurm;maxver=1)
 
 ## New Batch Interface for SLURM
 
-`NBI::Slurm` is a Perl package that provides a convenient interface for submitting jobs to SLURM, 
+[`NBI::Slurm`](https://metacpan.org/dist/NBI-Slurm) is a Perl package that provides a convenient interface for submitting jobs to SLURM, 
 a workload manager for *High-Performance Computing* (HPC) clusters. 
 It includes two main classes to submit jobs to SLURM: 
 
- * `NBI::Job`, which represents a job to be submitted to SLURM, and 
- * `NBI::Opts`, which represents the SLURM options for a job.
+* `NBI::Job`, which represents a job to be submitted to SLURM, and 
+* `NBI::Opts`, which represents the SLURM options for a job.
 
 And two classes to manage the output of the jobs:
 
- * `NBI::Queue`, which represents the content of the SLURM queue, and
- * `NBI::QueuedJob`, which represents a single job in the queue.
+* `NBI::Queue`, which represents the content of the SLURM queue, and
+* `NBI::QueuedJob`, which represents a single job in the queue.
 
 Features
 
- * Very experimental, very alpha, very buggy.
- * Easily create and configure SLURM jobs using the NBI::Job class.
- * Set job name, commands to execute, output and error file paths, and more.
- * Define SLURM options, such as queue, number of threads, allocated memory, and execution time, using the NBI::Opts class.
- * Generate the SLURM header for the job script.
- * Submit jobs to SLURM with just a few lines of code.
-
-
+* Very experimental, very alpha, very buggy.
+* Easily create and configure SLURM jobs using the NBI::Job class.
+* Comes with binaries to submit jobs, list jobs, wait for jobs, etc.
+  
 ## Installation
 
-To use NBI::Slurm, you need Perl 5.12 or higher installed on your system. 
+To use [NBI::Slurm](https://metacpan.org/dist/NBI-Slurm), you need Perl 5.12 or higher installed on your system. 
 You can install the package using CPAN or manually by copying the NBI/Slurm.pm file to your Perl library directory.
-
 
 cpanm is a command line utility for installing Perl modules from CPAN.
 
 To install cpanm, run the following command:
+
 ```bash
 # If you dont have cpanm installed:
 curl -L https://cpanmin.us | perl - --sudo App::cpanminus
@@ -46,27 +42,27 @@ curl -L https://cpanmin.us | perl - --sudo App::cpanminus
 cpanm NBI::Slurm
 ```
 
-## Scripts 
+## Scripts
 
-* List your jobs in the queue
+* List or cancel your jobs in the queue with **lsjobs**
 
 ```bash
 lsjobs [options] [jobid.. | pattern ]
 ```
 
-* Submit a job to the queue (with cores, memory, time, etc)
+* Submit a job to the queue (with cores, memory, time, etc) with **runjob**
 
 ```bash
 runjob -n "my-job" -t 2 -r -c 18 -m 32 --after "python script.py --threads 18"
 ```
 
-* Wait for all jobs matching a pattern to finish (to be used to run a second job when they are all finished)
+* Wait for all jobs matching a pattern to finish (to be used to run a second job when they are all finished), with **waitjobs**
 
 ```bash
 waitjobs [-u $USER] [pattern]
 ```
 
-* Who is using the cluster: list usernames and number of jobs in ascending order
+* Who is using the cluster: list usernames and number of jobs in ascending order with **whojobs**
 
 ```bash
 whojobs [--min-jobs INT]
@@ -82,16 +78,16 @@ use NBI::Opts;
 
 # Create a job
 my $job = NBI::Job->new(
-    -name => "job-name",
+    -name    => "job-name",
     -command => "ls -l",
 );
 
 # Create options
 my $opts = NBI::Opts->new(
-    -queue => "short",
+    -queue   => "short",
     -threads => 4,
-    -memory => 8,
-    -opts  => ["--output=TestJob.out", "--mail-user user@nmsu.edu"],
+    -memory  => 8,
+    -opts    => ["-m afterok:1234"],
 );
 
 # Set options for the job
@@ -105,8 +101,8 @@ For more detailed information on the available methods and options, please refer
 
 ## Author
 
-NBI::Slurm is written by Andrea Telatin
+[NBI::Slurm](https://metacpan.org/dist/NBI-Slurm) is written by [Andrea Telatin](https://telatin.github.io)
 
 ## License
 
-This module is released under the MIT License.
+This module is released under the [MIT License](https://mit-license.org/).

@@ -56,7 +56,7 @@ usage() unless ( $command);
 
 $name = autoname($command) unless (defined $name);
 
-my $afterok_string = defined @afterok[0] ? "-d afterok:" . join(":", @afterok) : undef;
+my $afterok_string = defined $afterok[0] ? "-d afterok:" . join(":", @afterok) : undef;
 
 my $opts = NBI::Opts->new(
     -queue => $queue,
@@ -107,6 +107,7 @@ sub usage {
     -m, --memory     Memory to use [default: 8Gb]
     -t, --threads    Number of threads [default: 1]
     --time           Time string [default: 0d 8h]
+    --aftert INT     Job ID to wait for [can be used multiple times]
     -T, --tmpdir     Temporary directory [default: /tmp]
     -r, --run        Run the job (otherwise, just print the script)
     --verbose        Verbose output
@@ -186,28 +187,33 @@ It provides a command-line interface for setting the job parameters, including t
 
 =over 4
 
-=item B<-n, --name>
+=item B<-n, --name> STR
 
 Specifies the name of the job (optional). If not provided, an automatic name will be generated based on the command being run.
 
-=item B<-q, --queue>
+=item B<-q, --queue> STR
 
 Specifies the queue name for the job. The default value is "nbi-short".
 Note that if you put a "*", it will be replaced by 'short', 'medium', or 'long' depending on the time specified with '--time'.
 
-=item B<-m, --memory>
+=item B<-m, --memory> INT (Gb)
 
 Specifies the amount of memory to use for the job. The default value is 8Gb.
 
-=item B<-t, --threads>
+=item B<-t, --threads> INT
 
 Specifies the number of threads to use for the job. The default value is 1.
 
-=item B<--time>
+=item B<--time> STR
 
-Specifies the time string for the job. The default value is "0d 8h". The format should be in the format of "Xd Xh Xm" where X represents the number of days (d), hours (h), and minutes (m) respectively.
+Specifies the time string for the job. The default value is "C<0d 8h>". 
+The format should be in the format of "Xd Xh Xm" where X represents the number of days (d), hours (h), and minutes (m) respectively.
 
-=item B<-T, --tmpdir>
+=item B<--after> INT
+
+Specifies the job ID to wait for before running the job. This option can be used multiple times to specify multiple jobs to wait for.
+
+=item B<-T, --tmpdir> PATH
 
 Specifies the temporary directory for the job. The default value is "/tmp".
 
