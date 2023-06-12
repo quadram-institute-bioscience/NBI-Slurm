@@ -26,7 +26,7 @@ sub new {
     my $state_short;
     my $partitions_csv;
     my $jobname;
-    if (substr($_[0], 0, 1) eq '-') {
+    if (defined $_[0] and substr($_[0], 0, 1) eq '-') {
         my %data = @_;
         for my $i (keys %data) {
             if ($i =~ /^-user/)  {

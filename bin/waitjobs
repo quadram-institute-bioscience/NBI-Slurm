@@ -44,7 +44,10 @@ if (defined $self_job_id and $self_job_id =~ /^\d+$/) {
 }
 
 my @starting_ids = @{$queue->ids()};
-print STDERR "Starting with ", $queue->len(), " jobs for ", $opt_user, " with name matching ", $opt_name ,"\n";
+print STDERR "[waitjob] There are ", 
+  GREEN, BOLD, $queue->len(), RESET  " jobs for ",
+  GREEN, BOLD, $opt_user,     RESET, " with name matching ",
+  GREEN, BOLD, $opt_name,     RESET, "\n";
 
 while (scalar @starting_ids > 0) {
     my $current_jobs = NBI::Queue->new();

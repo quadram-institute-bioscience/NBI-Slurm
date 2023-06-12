@@ -18,6 +18,7 @@ use NBI::Slurm;
 use Cwd;
 
 my $user_home_dir = $ENV{HOME};
+my @afterok;
 my $user_current_dir = getcwd();
 my $username = $ENV{USER};
 my $config = load_config("$user_home_dir/.nbislurm.config");
@@ -43,6 +44,7 @@ GetOptions(
     'r|run' => \$run,
     'a|email-address=s' => \$email_address,
     'e|mail-type=s' => \$mail_type, # 'BEGIN,END,FAIL,REQUEUE,ALL'
+    'after=s' => \@afterok,
     'verbose' => \$verbose,
     'help' => sub { usage() },
 );
@@ -54,6 +56,8 @@ usage() unless ( $command);
 
 $name = autoname($command) unless (defined $name);
 
+my $afterok_string = defined @afterok[0] ? "-d afterok:" . join(":", @afterok) : undef;
+
 my $opts = NBI::Opts->new(
     -queue => $queue,
     -threads => $threads,
@@ -62,7 +66,7 @@ my $opts = NBI::Opts->new(
     -tmpdir => $tmpdir,
     -email_address => $email_address,
     -email_type => $mail_type,
-
+    -opts => [$afterok_string],
 );
 
 if ($verbose) {

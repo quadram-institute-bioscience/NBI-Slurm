@@ -181,6 +181,11 @@ sub header {
         $str .= "#SBATCH --mail-user=" . $self->{email_address} . "\n";
         $str .= "#SBATCH --mail-type=" . $self->{email_type} . "\n";
     }
+    # Custom options
+    for my $o (@{$self->{opts}}) {
+        next if not defined $o;
+        $str .= "#SBATCH $o\n";
+    }
     return $str;
 }
 

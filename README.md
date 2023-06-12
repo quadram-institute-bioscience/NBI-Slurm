@@ -9,10 +9,15 @@
 
 `NBI::Slurm` is a Perl package that provides a convenient interface for submitting jobs to SLURM, 
 a workload manager for *High-Performance Computing* (HPC) clusters. 
-It includes two main classes: 
+It includes two main classes to submit jobs to SLURM: 
 
  * `NBI::Job`, which represents a job to be submitted to SLURM, and 
  * `NBI::Opts`, which represents the SLURM options for a job.
+
+And two classes to manage the output of the jobs:
+
+ * `NBI::Queue`, which represents the content of the SLURM queue, and
+ * `NBI::QueuedJob`, which represents a single job in the queue.
 
 Features
 
@@ -41,8 +46,33 @@ curl -L https://cpanmin.us | perl - --sudo App::cpanminus
 cpanm NBI::Slurm
 ```
 
+## Scripts 
 
-## Usage
+* List your jobs in the queue
+
+```bash
+lsjobs [options] [jobid.. | pattern ]
+```
+
+* Submit a job to the queue (with cores, memory, time, etc)
+
+```bash
+runjob -n "my-job" -t 2 -r -c 18 -m 32 --after "python script.py --threads 18"
+```
+
+* Wait for all jobs matching a pattern to finish (to be used to run a second job when they are all finished)
+
+```bash
+waitjobs [-u $USER] [pattern]
+```
+
+* Who is using the cluster: list usernames and number of jobs in ascending order
+
+```bash
+whojobs [--min-jobs INT]
+```
+
+## Library Usage
 
 Here's a simple example demonstrating how to use NBI::Slurm to submit a job to SLURM:
 
