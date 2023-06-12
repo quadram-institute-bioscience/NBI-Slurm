@@ -1,9 +1,7 @@
 name: Ubuntu_18
  
 on:
-    push:
-        branches: '*'
-    pull_request:
+    release:
         branches: '*'
         
 jobs:
