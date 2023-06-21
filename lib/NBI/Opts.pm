@@ -14,7 +14,12 @@ my $SYSTEM_TEMPDIR = $ENV{'TMPDIR'} || $ENV{'TEMP'} || "/tmp";
 require Exporter;
 our @ISA = qw(Exporter);
 
- 
+sub _yell {
+    use Term::ANSIColor;
+    my $msg = shift @_;
+    my $col = shift @_ || "bold green";
+    say STDERR color($col), "[NBI::Opts]", color("reset"), " $msg";
+}
 sub new {
     my $class = shift @_;
     my ($queue, $memory, $threads, $opts_array, $tmpdir, $hours, $email_address, $email_when) = (undef, undef, undef, undef, undef, undef, undef);
@@ -24,31 +29,58 @@ sub new {
         my %data = @_;
         # Try parsing
         for my $i (keys %data) {
+            # QUEUE
             if ($i =~ /^-queue/) {
+                next unless (defined $data{$i});
                 $queue = $data{$i};
+
+            # THREADS
             } elsif ($i =~ /^-threads/) {
+                next unless (defined $data{$i});
                 # Check it's an integer 
                 if ($data{$i} =~ /^\d+$/) {
                     $threads = $data{$i};
                 } else {
                     confess "ERROR NBI::Seq: -threads expects an integer\n";
                 }
+                
+                
+            # MEMORY
             } elsif ($i =~ /^-memory/) {
+                next unless (defined $data{$i});
                 $memory = _mem_parse_mb($data{$i});
+               
+
+            # TMPDIR
             } elsif ($i =~ /^-tmpdir/) {
-                $memory = $data{$i};
+                next unless (defined $data{$i});
+                $tmpdir = $data{$i};
+               
+            # MAIL ADDRESS
             } elsif ($i =~ /^-(mail|email_address)/) {
+                next unless (defined $data{$i});
                 $email_address = $data{$i};
+                
+            # WHEN MAIL
             } elsif ($i =~ /^-(when|email_type)/) {
+                next unless (defined $data{$i});
                 $email_when = $data{$i};
+                
+
+            # OPTS ARRAY
             } elsif ($i =~ /^-opts/) {
+                next unless (defined $data{$i});
                 # in this case we expect an array
                 if (ref($data{$i}) ne "ARRAY") {
                     confess "ERROR NBI::Seq: -opts expects an array\n";
                 }
                 $opts_array = $data{$i};
+                
+
+            # TIME
             } elsif ($i =~ /^-time/) {
                 $hours = _time_to_hour($data{$i});
+                
             } else {
                 confess "ERROR NBI::Seq: Unknown parameter $i\n";
             }
@@ -67,6 +99,11 @@ sub new {
     $self->email_type = defined $email_when ? $email_when : "none";
     # Set options
     $self->opts = defined $opts_array ? $opts_array : [];
+    
+    
+    
+    
+
     return $self;
  
 }

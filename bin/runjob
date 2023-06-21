@@ -25,30 +25,33 @@ my $config = load_config("$user_home_dir/.nbislurm.config");
 my $version = $NBI::Slurm::VERSION;
 my $queue = $config->{'queue'} // 'qib-short,nbi-short';
 my $threads = 1;
-my $memory = 8000;
-my $time = 2;
-my $tmpdir = "/tmp";
+my $memory = $config->{'memory'} // 8000;
+my $time = $config->{'time'} // "2h";
+my $tmpdir = $config->{'tmpdir'} // "/tmp";
 my $name;
 my $email_address = $config->{'email'} // undef;
 my $mail_type = $config->{'email_type'} // "none";
 my $command;
 my $verbose;
+my $debug;
 my $run;
 GetOptions(
-    'm|memory=s' => \$memory,
-    't|threads=i' => \$threads,
-    'q|queue=s' => \$queue,
-    'time=s' => \$time,
-    'T|tmpdir=s' => \$tmpdir,
-    'n|name=s' => \$name,
-    'r|run' => \$run,
+    'm|memory=s'    => \$memory,
+    'c|t|threads=i' => \$threads,
+    'q|queue=s'     => \$queue,
+    'T|time=s'        => \$time,
+    'w|tmpdir=s'    => \$tmpdir,
+    'n|name=s'      => \$name,
+    'r|run'         => \$run,
     'a|email-address=s' => \$email_address,
     'e|mail-type=s' => \$mail_type, # 'BEGIN,END,FAIL,REQUEUE,ALL'
-    'after=s' => \@afterok,
-    'verbose' => \$verbose,
-    'help' => sub { usage() },
+    'after=s'       => \@afterok,
+    'verbose'       => \$verbose,
+    'debug'         => \$debug,
+    'help'          => sub { usage() },
 );
 
+$debug = 1 if ($ENV{"DEBUG"});
 # Update queue based on time
 $queue = update_queue($queue, $time);
 $command = join(" ", @ARGV);
@@ -57,6 +60,7 @@ usage() unless ( $command);
 $name = autoname($command) unless (defined $name);
 
 my $afterok_string = defined $afterok[0] ? "-d afterok:" . join(":", @afterok) : undef;
+
 
 my $opts = NBI::Opts->new(
     -queue => $queue,
@@ -69,6 +73,7 @@ my $opts = NBI::Opts->new(
     -opts => [$afterok_string],
 );
 
+
 if ($verbose) {
     say STDERR "CONFIG:\n", Dumper($config);
     say STDERR $opts->view();
@@ -79,6 +84,9 @@ my $job = NBI::Job->new(
     -command =>  "cd \"$user_current_dir\"",
     -opts => $opts
 );
+if ($debug) {
+    say STDERR "JOB:\n", Dumper($job);
+}
 $job->append_command($command);
 if ($verbose) {
     say STDERR $job->script();
@@ -106,9 +114,9 @@ sub usage {
     -q, --queue      Queue name [default: nbi-short]
     -m, --memory     Memory to use [default: 8Gb]
     -t, --threads    Number of threads [default: 1]
-    --time           Time string [default: 0d 8h]
+    -T, --time       Time string [default: "0d 8h"]
     --aftert INT     Job ID to wait for [can be used multiple times]
-    -T, --tmpdir     Temporary directory [default: /tmp]
+    -w, --tmpdir     Temporary directory [default: /tmp]
     -r, --run        Run the job (otherwise, just print the script)
     --verbose        Verbose output
     --help           This help message
@@ -200,22 +208,22 @@ Note that if you put a "*", it will be replaced by 'short', 'medium', or 'long' 
 
 Specifies the amount of memory to use for the job. The default value is 8Gb.
 
-=item B<-t, --threads> INT
+=item B<-c, -t, --threads> INT
 
-Specifies the number of threads to use for the job. The default value is 1.
+Specifies the number of threads (cores) to use for the job. The default value is 1.
 
-=item B<--time> STR
+=item B<-T, --time> STR
 
-Specifies the time string for the job. The default value is "C<0d 8h>". 
+Specifies the B<time string> for the job. The default value is "C<0d 8h>". 
 The format should be in the format of "Xd Xh Xm" where X represents the number of days (d), hours (h), and minutes (m) respectively.
 
 =item B<--after> INT
 
 Specifies the job ID to wait for before running the job. This option can be used multiple times to specify multiple jobs to wait for.
 
-=item B<-T, --tmpdir> PATH
+=item B<-w, --tmpdir> PATH
 
-Specifies the temporary directory for the job. The default value is "/tmp".
+Specifies the temporary (working) directory for the job. The default value is "/tmp".
 
 =item B<-r, --run>
 
@@ -237,6 +245,9 @@ The script will look for a configuration file in the user's home directory at C<
 
   queue=qib-*,nbi-*
   email=my@address
+  tmpdir=/home/user/slurm
+  memory=8000
+  time=3h
 
 =head1 EXAMPLES
 
