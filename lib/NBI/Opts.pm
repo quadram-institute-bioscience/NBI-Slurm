@@ -23,16 +23,20 @@ sub _yell {
 sub new {
     my $class = shift @_;
     my ($queue, $memory, $threads, $opts_array, $tmpdir, $hours, $email_address, $email_when) = (undef, undef, undef, undef, undef, undef, undef);
-
+    
     # Descriptive instantiation with parameters -param => value
     if (substr($_[0], 0, 1) eq '-') {
+        
         my %data = @_;
+
         # Try parsing
         for my $i (keys %data) {
+            
             # QUEUE
             if ($i =~ /^-queue/) {
                 next unless (defined $data{$i});
                 $queue = $data{$i};
+                
 
             # THREADS
             } elsif ($i =~ /^-threads/) {
