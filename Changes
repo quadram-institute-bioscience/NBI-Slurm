@@ -1,27 +1,37 @@
-0.4.2 2023-06
- * Bumped Perl requirement to 5.16, to keep using lvalue subs
+0.4.3 2023-06-27
+
+* Added extra binary `session` to start an interactive session (currently not bound to the module itself)
+
+0.4.2 2023-06-25
+
+* Bumped Perl requirement to 5.16, to keep using lvalue subs
 
 0.4.1   2023-06-18
- * BUGFIX in setting job options (tmpdir was not working)
- * Fixed documentation
+
+* BUGFIX in setting job options (tmpdir was not working)
+* Fixed documentation
 
 0.4.0   2023-06-12
- * Added `--after INT` in `runjobs`
- 
+
+* Added `--after INT` in `runjobs`
+
 0.3.0   2023-06-10
- * Drafted `waitjobs`
- * Drafted `NBI::Queue` to check jobs in queue, saved as `NBI::QueuedJob` objects
+
+* Drafted `waitjobs`
+* Drafted `NBI::Queue` to check jobs in queue, saved as `NBI::QueuedJob` objects
   
 0.2.0   2023-06-08
- * Drafted `lsjobs`, `whojobs` 
+
+* Drafted `lsjobs`, `whojobs` 
 
 0.1.2   2023-06-07  
- * Added release tests
+
+* Added release tests
 
 0.1.1  2023-06-07  
- * Releases a prototype binary script (runjob)
+
+* Releases a prototype binary script (runjob)
 
 0.1.0  2023-06-06
- * Initial release
 
-
+* Initial release

@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-#ABSTRACT: List the jobs, and delete them
+#ABSTRACT: List your jobs (or others), and delete them if you wish
 #PODNAME: lsjobs
 
 use v5.12;
@@ -11,7 +11,7 @@ use Term::ANSIColor qw(:constants);
 $Data::Dumper::Sortkeys = 1;
 
 if (-e "$RealBin/../dist.ini") {
-    say STDERR "[dev mode] Using local lib";
+    say STDERR "[dev mode] Using local lib"  if ($ENV{"DEBUG"});
     use lib "$RealBin/../lib";
 } 
 
@@ -20,7 +20,7 @@ use Cwd;
 
 
 
-my $jobs = getjobs();
+
 
 my $unix_username = $ENV{USER};
 my $user_home_dir = $ENV{HOME};
@@ -41,9 +41,11 @@ GetOptions(
     'r|running' => \$opt_running_bool,
     'd|delete' => \$opt_delete_bool,
     'verbose' => \$opt_verbose_bool,
+    'version' => sub { say "lsjobs v", $NBI::Slurm::VERSION; exit },
     'help' => sub { usage() },
 );
 
+my $jobs = getjobs();
 my @ids = ();
 for my $positional (@ARGV) {
     if ($positional =~ /^(\d+)$/) {

@@ -7,10 +7,12 @@ use warnings;
 use Getopt::Long;
 use FindBin qw($RealBin);
 use Data::Dumper;
+use File::Basename;
+my $BIN = basename($0);
 $Data::Dumper::Sortkeys = 1;
 
 if (-e "$RealBin/../dist.ini") {
-    say STDERR "[dev mode] Using local lib";
+    say STDERR "[dev mode] Using local lib" if ($ENV{"DEBUG"});
     use lib "$RealBin/../lib";
 } 
 
@@ -47,6 +49,7 @@ GetOptions(
     'e|mail-type=s' => \$mail_type, # 'BEGIN,END,FAIL,REQUEUE,ALL'
     'after=s'       => \@afterok,
     'verbose'       => \$verbose,
+    'version'       => sub { say "runjob v", $NBI::Slurm::VERSION; exit },
     'debug'         => \$debug,
     'help'          => sub { usage() },
 );
@@ -107,7 +110,7 @@ sub usage {
  ----------------------------------------------------------
   NBI Slurm queuer $version
  ----------------------------------------------------------
- runjob [options] "Command to run"
+ $BIN [options] "Command to run"
 
  Options:
     -n, --name       Job name [optional]

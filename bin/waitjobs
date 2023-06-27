@@ -9,7 +9,7 @@ use FindBin qw($RealBin);
 use Data::Dumper;
 use Term::ANSIColor qw(:constants);
 if (-e "$RealBin/../dist.ini") {
-    say STDERR "[dev mode] Using local lib";
+    say STDERR "[dev mode] Using local lib"  if ($ENV{"DEBUG"});
     use lib "$RealBin/../lib";
 } 
 use NBI::Slurm;
@@ -29,6 +29,7 @@ GetOptions(
     'n|name=s' => \$opt_name,
     'r|refresh=i' => $refresh_time,
     'verbose' => \$opt_verbose_bool,
+    'version' => sub { say "waitjobs v", $NBI::Slurm::VERSION; exit },
     'debug' => \$opt_debug_bool,
     'help' => sub { usage() },
 );
