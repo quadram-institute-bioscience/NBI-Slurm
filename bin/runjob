@@ -26,7 +26,7 @@ my $username = $ENV{USER};
 my $config = load_config("$user_home_dir/.nbislurm.config");
 my $version = $NBI::Slurm::VERSION;
 my $queue = $config->{'queue'} // 'qib-short,nbi-short';
-my $threads = 1;
+my $threads = $config->{'threads'} // 1;
 my $memory = $config->{'memory'} // 8000;
 my $time = $config->{'time'} // "2h";
 my $tmpdir = $config->{'tmpdir'} // "/tmp";
@@ -56,7 +56,8 @@ GetOptions(
 
 $debug = 1 if ($ENV{"DEBUG"});
 # Update queue based on time
-$queue = update_queue($queue, $time);
+my $time_hours = NBI::Opts::_time_to_hour($time);
+$queue = update_queue($queue, $time_hours);
 $command = join(" ", @ARGV);
 usage() unless ( $command);
 
