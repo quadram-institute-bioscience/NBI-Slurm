@@ -1,26 +1,31 @@
-name: Ubuntu_18
- 
-on:
-    release:
-        branches: '*'
-        
+---
+"on":
+  push:
+    paths-ignore:
+      - "**.md"
+  pull_request:
+    paths-ignore:
+      - "**.md"
+  workflow_dispatch:
+
+
+
 jobs:
-  perl-job:
+  test:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-last]
-        perl-version:
-          - '5.24'
-          - 'latest'
-    runs-on: ${{ matrix.os }}
-    container:
-      image: perldocker/perl-tester:${{ matrix.perl-version }}     # https://hub.docker.com/r/perldocker/perl-tester
-    name: Perl ${{ matrix.perl-version }}
+        runs-on:
+          - ubuntu-latest
+    runs-on: ${{ matrix.runs-on }}
     steps:
-      - uses: actions/checkout@v2
-      - name: Regular tests
+      - uses: actions/checkout@v3
+      - uses: shogo82148/actions-setup-perl@v1
+      - name: Install Dependencies
+        run: >
+          cpanm -qn Dist::Zilla
+      - name: Test
         run: |
-          dzil authordeps --missing | cpanm --notest
-          dzil listdeps --author --missing | cpanm --notest
+          dzil authordeps --missing | cpanm -qn
+          dzil listdeps --author --missing  | cpanm -qn
           dzil test --author --release --verbose
