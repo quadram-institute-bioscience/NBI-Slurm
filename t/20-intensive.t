@@ -43,11 +43,11 @@ for (my $i = 0; $i <= $TOTAL; $i++) {
         -opts => $opts
     );
 
-    if (defined $opt_last) {
-        is($opt_last->view(), $opts->view(), "Opts->view() is correct ($i/$TOTAL times)");
+    if (defined $opt_last and $opt_last->view() ne $opts->view() or $i == $TOTAL) {
+        is($opt_last->view(), $opts->view(), "Opts->view() is self-consistent ($i/$TOTAL times)");
     }
-    if (defined $job_last) {
-        is($job_last->script(), $job->script(), "Job->script() is correct ($i/$TOTAL times)");
+    if (defined $job_last and $job_last->script() ne $job->script() or $i == $TOTAL) {
+        is($job_last->script(), $job->script(), "Job->script() is self-consistent ($i/$TOTAL times)");
     }
     $opt_last = $opts;
     $job_last = $job;

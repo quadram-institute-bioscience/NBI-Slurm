@@ -1,12 +1,41 @@
 #!/usr/bin/env perl
-#ABSTRACT: How to make your configuration file
-#PODNAME: How to make your configuration file
+#ABSTRACT: How to make your configuration file for NBI::Slurm tools
+#PODNAME: configuration_file_info
+
+use strict;
+use warnings;
+use feature qw(say);
+use FindBin qw($RealBin);
+use Getopt::Long;
+use Pod::Usage;
+GetOptions(
+    'help' => sub { pod2usage() },
+);
+my $home_dir = $ENV{HOME};
+if (-e "$home_dir/.nbislurm.config") {
+
+} else {
+    my $system_tmp_dir = $ENV{TMPDIR} || '/tmp';
+    say STDERR "Creating configuration file at $home_dir/.nbislurm.config";
+    open(my $fh, ">", "$home_dir/.nbislurm.config") or die "Can't open $home_dir/.nbislurm.config for writing: $!";
+    say $fh <<"=cut";
+
+# Default configuration file for NBI::Slurm tools
+# This file is in key=value format, and can be edited manually.
+# 
+tmpdir=$system_tmp_dir
+
+=cut
+}
 
 =pod
 
 =head1 LOCATION
 
-L<NBI::Slurm> uses a configuration file to store some default values.
+L<NBI::Slurm> tools use a configuration file to store some default values.
+
+At the moment there is no central use of the file, and it's just provided
+as a convenient shortcut for some of the options.
 
 The configuration file is located at C<~/.nbislurm.config>.
 

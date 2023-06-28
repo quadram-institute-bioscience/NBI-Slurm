@@ -8,6 +8,8 @@ use Getopt::Long;
 use FindBin qw($RealBin);
 use Data::Dumper;
 use File::Basename;
+use File::Spec;
+use Term::ANSIColor qw(:constants);
 my $BIN = basename($0);
 $Data::Dumper::Sortkeys = 1;
 
@@ -39,9 +41,9 @@ my $debug;
 my $run;
 GetOptions(
     'm|memory=s'    => \$memory,
-    'c|t|threads=i' => \$threads,
+    'c|cores|threads=i' => \$threads,
     'q|queue=s'     => \$queue,
-    'T|time=s'        => \$time,
+    't|time=s'      => \$time,
     'w|tmpdir=s'    => \$tmpdir,
     'n|name=s'      => \$name,
     'r|run'         => \$run,
@@ -61,6 +63,28 @@ $queue = update_queue($queue, $time_hours);
 $command = join(" ", @ARGV);
 usage() unless ( $command);
 
+# Check threadshours
+if (-d $time) {
+    say STDERR RED, BOLD, "ERROR:", RESET, " did you mean \"--tmpdir $time\"  instead of $threads threads?";
+    usage();
+}
+
+# Sanitize tempdir
+if (-d $tmpdir) {
+    $tmpdir = File::Spec->rel2abs($tmpdir);
+} else {
+    # Check if it was meant to be a TIME instead
+    if ($tmpdir =~/ / or $tmpdir =~/(\d+)[dh]/) {
+        say STDERR RED, BOLD, "WARNING:", RESET, " $tmpdir looks like a time string, not a directory!";
+    }
+    mkdir($tmpdir) or die "Cannot create $tmpdir: $!";
+}
+
+# Sanitize memory
+if ($memory =~/^(\d+)$/ and $1 < 200) {
+    say STDERR RED, BOLD, "WARNING:", RESET, " $memory is in Mb but <200, autoscaling to $memory GB";
+    $memory = $1 * 1000;
+}
 $name = autoname($command) unless (defined $name);
 
 my $afterok_string = defined $afterok[0] ? "-d afterok:" . join(":", @afterok) : undef;
@@ -108,18 +132,14 @@ if ($run) {
 
 sub usage {
     say STDERR <<END;
- ----------------------------------------------------------
-  NBI Slurm queuer $version
- ----------------------------------------------------------
- $BIN [options] "Command to run"
 
  Options:
     -n, --name       Job name [optional]
     -q, --queue      Queue name [default: nbi-short]
     -m, --memory     Memory to use [default: 8Gb]
-    -t, --threads    Number of threads [default: 1]
+    -c, --cores      Number of threads [default: 1]
     -T, --time       Time string [default: "0d 8h"]
-    --aftert INT     Job ID to wait for [can be used multiple times]
+    --after  INT     Job ID to wait for [can be used multiple times]
     -w, --tmpdir     Temporary directory [default: /tmp]
     -r, --run        Run the job (otherwise, just print the script)
     --verbose        Verbose output
@@ -145,7 +165,7 @@ sub load_config {
     my $filename = shift;
     my $config = {};
     if (! -e "$filename") {
-        say STDERR "Config file not found: $filename";
+        say STDERR "Config file not found: $filename"  if ($ENV{"DEBUG"});
         return $config;
     }
     open(my $fh, "<", $filename) or die "Cannot open $filename: $!";
@@ -185,14 +205,17 @@ sub update_queue {
     }
     return $queue;
 }
+
 __END__
+
 =head1 SYNOPSIS
 
-runjob [options] "Command to run"
+  runjob [options] "Command to run"
 
 =head1 DESCRIPTION
 
 The C<runjob> script allows you to submit a job to the cluster using the NBI::Slurm module. 
+
 It provides a command-line interface for setting the job parameters, including the queue, memory, threads, and execution time.
 
 =head1 OPTIONS
@@ -212,7 +235,7 @@ Note that if you put a "*", it will be replaced by 'short', 'medium', or 'long' 
 
 Specifies the amount of memory to use for the job. The default value is 8Gb.
 
-=item B<-c, -t, --threads> INT
+=item B<-c, --cores, --threads> INT
 
 Specifies the number of threads (cores) to use for the job. The default value is 1.
 
@@ -261,7 +284,7 @@ Submitting a job to the default queue with 4Gb memory and running the job:
 
 Submitting a job with a custom name, 2 threads, and running a Python script:
 
-    runjob -n "my-job" -t 2 -r "python script.py"
+    runjob -n "my-job" -c 2 -r "python script.py"
 
 Printing the job script without running it:
 

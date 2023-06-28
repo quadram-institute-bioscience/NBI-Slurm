@@ -95,7 +95,7 @@ sub load_config {
     my $filename = shift;
     my $config = {};
     if (! -e "$filename") {
-        say STDERR "# Config file not found: $filename";
+        say STDERR "# Config file not found: $filename" if ($ENV{"DEBUG"});
         return $config;
     }
     open(my $fh, "<", $filename) or die "Cannot open $filename: $!";

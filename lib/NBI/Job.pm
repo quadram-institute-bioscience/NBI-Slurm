@@ -194,7 +194,7 @@ sub script {
     # Add the commands
     $script .= join("\n", @{$self->{commands}});
 
-    return $header . $script;
+    return $header . $script . "\n";
 
 }
 
