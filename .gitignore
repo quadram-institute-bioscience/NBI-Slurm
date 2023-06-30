@@ -1,2 +1,5 @@
 .build
 NBI-Slurm-*
+lib/Text
+lib/x86_64-linux-thread-multi
+lib/Module

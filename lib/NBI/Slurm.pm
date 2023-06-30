@@ -7,8 +7,8 @@ use NBI::Job;
 use NBI::Opts;
 use base qw(Exporter);
 our @ISA = qw(Exporter);
-our @EXPORT = qw(Job Opts %FORMAT_STRINGS);
-$NBI::Slurm::VERSION = '0.4.5';
+our @EXPORT = qw(Job Opts load_config %FORMAT_STRINGS);
+$NBI::Slurm::VERSION = '0.4.6';
 
 
 
@@ -32,6 +32,30 @@ our %FORMAT_STRINGS = (
 );
 
 
+sub load_config {
+    my $filename = shift;
+    if (! $filename) {
+        $filename = "$ENV{HOME}/.nbislurm.config";
+    }
+    my $config = {};
+    if (! -e "$filename") {
+        say STDERR "# Config file not found: $filename" if ($ENV{"DEBUG"});
+        return $config;
+    }
+    open(my $fh, "<", $filename) or die "Cannot open $filename: $!";
+    while (<$fh>) {
+        chomp;
+        next if (/^\s*$/);
+        next if (/^#/);
+        next if (/^;/);
+        my ($key, $value) = split(/=/, $_);
+        # discard keys with spaces
+        next if ($key =~ /\s/);
+        $config->{$key} = $value;
+    }
+    close  $fh;
+    return $config;
+}
 
 
 

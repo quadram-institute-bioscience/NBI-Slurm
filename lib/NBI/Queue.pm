@@ -231,3 +231,11 @@ Returns the length (number of jobs) in the queue.
   my @job_ids = $queue->ids;
 
 Returns an array or array reference (depending on the context) containing the job IDs in the queue.
+
+=head2 remove
+
+  $queue->remove($jobid);
+
+Removes the job with the specified job ID from the queue.
+
+=cut

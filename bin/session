@@ -13,7 +13,7 @@ if (-e "$RealBin/../dist.ini") {
 use NBI::Slurm;
 my $BIN = basename($0);
 my $USER = $ENV{USER};
-my $config = load_config("$USER/.nbislurm.config");
+my $config = NBI::Slurm::load_config("$USER/.nbislurm.config");
 my $DEFAULT_SESSION = $config->{'session'} // "";
 my $SPECIAL_SESSION = $config->{'special_session'} // "";
 my $NAME = "session";
@@ -36,7 +36,7 @@ GetOptions(
     'verbose' => \$OPT_VERBOSE,
     'version' => sub { say "session v", $NBI::Slurm::VERSION; exit(0); },
     'help' => sub { usage(); exit(0); },
-);
+) or usage(1);
 
 # Get memory
 $MEM_MB = parse_memory($MEM_MB);
@@ -91,27 +91,6 @@ sub hours_to_days_hours {
     return ($days, $hours);
 }
 
-sub load_config {
-    my $filename = shift;
-    my $config = {};
-    if (! -e "$filename") {
-        say STDERR "# Config file not found: $filename" if ($ENV{"DEBUG"});
-        return $config;
-    }
-    open(my $fh, "<", $filename) or die "Cannot open $filename: $!";
-    while (<$fh>) {
-        chomp;
-        next if (/^\s*$/);
-        next if (/^#/);
-        next if (/^;/);
-        my ($key, $value) = split(/=/, $_);
-        # discard keys with spaces
-        next if ($key =~ /\s/);
-        $config->{$key} = $value;
-    }
-    close  $fh;
-    return $config;
-}
 
 sub parse_memory {
     # Parse string return mb
@@ -144,6 +123,7 @@ Options:
   -i, --intel     Use Intel constraint (default: off)
 
 EOF
+  exit() if ($_[0]);
 }
 
 sub has_srun {

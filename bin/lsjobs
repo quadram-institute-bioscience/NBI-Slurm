@@ -8,6 +8,8 @@ use Getopt::Long;
 use FindBin qw($RealBin);
 use Data::Dumper;
 use Term::ANSIColor qw(:constants);
+use File::Basename;
+use Text::ASCIITable;
 $Data::Dumper::Sortkeys = 1;
 
 if (-e "$RealBin/../dist.ini") {
@@ -21,7 +23,7 @@ use Cwd;
 
 
 
-
+my $current_slurm_jobid = $ENV{SLURM_JOBID} // -1;
 my $unix_username = $ENV{USER};
 my $user_home_dir = $ENV{HOME};
 
@@ -69,8 +71,8 @@ if ($opt_verbose_bool) {
 }
 
 my $selected_jobs = {};
-my $selected_arrays = [['Queue', 'User', 'JobID', 'Name', 'State', 'Time', 'NodeList', 'CPUS', 'Memory', 'Reason'],
-                       ['-----', '----', '-----', '----', '-----', '----', '--------', '----', '------', '------']];
+my $selected_arrays = [['JobID', 'User', 'Queue', 'Name', 'State', 'Time', 'TotalTime', 'NodeList', 'CPUS', 'Memory', 'Reason'],
+                       ['-----', '----', '-----', '----', '-----', '----', '---------', '--------', '----', '------', '------']];
 
 for my $job (sort keys %{$jobs}) {
     # Check user (full match)
@@ -96,26 +98,43 @@ for my $job (sort keys %{$jobs}) {
     if (scalar @ids > 0 and not grep {$_ eq $job} @ids) {
         next;
     }
-    my $array = [$jobs->{$job}->{PARTITION},
+    my $array = [$jobs->{$job}->{JOBID},
                  $jobs->{$job}->{USER},
-                 $jobs->{$job}->{JOBID},
+                 $jobs->{$job}->{PARTITION},
                  $jobs->{$job}->{NAME},
-                 $jobs->{$job}->{STATE},
+                 state_string($jobs->{$job}->{STATE}),
                  $jobs->{$job}->{TIME},
+                 $jobs->{$job}->{TIME_LIMIT},
                  $jobs->{$job}->{NODELIST},
                  $jobs->{$job}->{"CPUS"},
                  $jobs->{$job}->{"MIN_MEMORY"},
-                 $jobs->{$job}->{"REASON"},];
+                 reason_string($jobs->{$job}->{"REASON"}),];
     push(@{$selected_arrays}, $array); 
 
 
 }
 render_table(@{$selected_arrays});
+print RESET, "\n";
+
+## Print single job
+if ($opt_verbose_bool and scalar @{$selected_arrays} == 3) {
+    my $job = extractJobByID($jobs, $selected_arrays->[2]->[0]);
+    for my $key (sort keys %{$job}) {
+        # Filter useless values
+        if ($job->{$key} =~ /^$/ or $job->{$key} =~ /^(\(null\)|\*)$/) {
+            next;
+        }
+        if ($key =~/(S_C_T|USER|ACCOUNT)/) {
+            next;
+        }
+        say YELLOW, sprintf("%-20s", $key), RESET, $job->{$key};
+    }
+}   
 
 my @selected_ids = joblist_to_ids(@{$selected_arrays});
 
 
-if ($opt_delete_bool and scalar @selected_ids) {
+if ($opt_delete_bool and (scalar @selected_ids)) {
     say RED "\nDELETE JOBS:", RESET;
     if (prompt("Delete " . scalar(@selected_ids) . " jobs?", 'n') =~ /^(y|Y|yes|YES)$/) {
         my $command = "scancel " . join(" ", @selected_ids);
@@ -125,8 +144,39 @@ if ($opt_delete_bool and scalar @selected_ids) {
         }
     } 
 
+} elsif ($opt_delete_bool) {
+    say STDERR "No jobs selected for deletion";
 }
 
+sub state_string {
+    my $s = shift;
+    my $c = RESET;
+    if ($s =~/^R/) {
+        $c = GREEN . ON_BLACK;
+    } elsif ($s =~/^P/) {
+        $c = YELLOW . ON_BLACK;
+    } else {
+        $c = RED . ON_BLACK;
+    }
+    return $c . $s . RESET .  ON_BLACK;
+}
+sub reason_string {
+
+
+    my $s = shift;
+    my $c = RESET;
+    if ($s =~/^None/) {
+        $c = BLUE . ON_BLACK;
+    } elsif ($s =~/^Priority/) {
+        $c = YELLOW . ON_BLACK;
+    } elsif ($s =~/^Bad/) {
+        $c = WHITE . ON_RED;
+    } else {
+        $c = RED . ON_BLACK;
+    }
+    return $c . $s . RESET . ON_BLACK;
+
+}
 sub joblist_to_ids {
     # Receive a list of lists (all same length) and returns a list of jobids
     my @rows = @_;
@@ -135,8 +185,14 @@ sub joblist_to_ids {
     
     for my $row (@rows) {
         # Skip non numeric values
-        next if ($row->[2] !~ /^\d+$/);
-        push @ids, $row->[2];
+        
+        next if ($row->[0] !~ /^\d+$/);
+        if ($row->[0] eq $current_slurm_jobid) {
+            say STDERR "WARNING: Skipping for deletion current job $current_slurm_jobid";
+            next;
+        }
+        push @ids, $row->[0];
+        
        
     }
 
@@ -170,21 +226,45 @@ sub render_table {
     for my $col (0..$n_cols-1) {
         my $max_width = 0;
         for my $row (@rows) {
-            my $width = length($row->[$col]);
+            my $width = ascii_len($row->[$col]);
             $max_width = $width if ($width > $max_width);
         }
         push(@max_widths, $max_width);
     }
     # Now print the table
     for my $row (@rows) {
-        my $line = "";
+        my $line = WHITE . ON_BLACK;
         for my $col (0..$n_cols-1) {
             my $width = $max_widths[$col];
             my $cell = $row->[$col];
-            $line .= sprintf("|%-${width}s ", $cell);
+            my $stripped = $cell;
+            $stripped  =~  s/\e\[[0-9;]*m//g;
+            my $tmpline .= sprintf("|%-${width}s ", $stripped);
+            $tmpline =~s/$stripped/$cell/;
+            $line .= $tmpline;
         }
         say $line, "|";
     }
+    print RESET;
+}
+
+sub ascii_len {
+    my $string = shift;
+    # Return legnth excluding ANSI escape sequences
+    $string =~ s/\e\[[0-9;]*m//g;
+    return length($string);
+}
+
+sub extractJobByID {
+    my ($jobs, $id) = @_;
+    my $job = {};
+    for my $jobid (keys %{$jobs}) {
+        if ($jobid eq $id) {
+            $job = $jobs->{$jobid};
+            last;
+        }
+    }
+    return $job;
 }
 sub getjobs {
     # Create an anonymous hash, and return it
@@ -311,6 +391,8 @@ Delete the selected jobs. This option must be used with caution, but an interact
 =item B<--verbose>
 
 Display verbose output.
+
+If a single job is selected, for example by giving a precise ID, the full job details will be displayed.
 
 =item B<--help>
 

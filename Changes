@@ -1,3 +1,7 @@
+0.4.6 2023-06-30
+
+* `lsjobs` updated with colored output, detailed view of single jobs, rearranged columns
+
 0.4.5 2023-06-29
 
 * Changes in `runjob` parameters

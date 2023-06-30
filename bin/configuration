@@ -18,14 +18,14 @@ if (-e "$home_dir/.nbislurm.config") {
     my $system_tmp_dir = $ENV{TMPDIR} || '/tmp';
     say STDERR "Creating configuration file at $home_dir/.nbislurm.config";
     open(my $fh, ">", "$home_dir/.nbislurm.config") or die "Can't open $home_dir/.nbislurm.config for writing: $!";
-    say $fh <<"=cut";
+    say $fh <<"END";
 
 # Default configuration file for NBI::Slurm tools
 # This file is in key=value format, and can be edited manually.
 # 
 tmpdir=$system_tmp_dir
 
-=cut
+END
 }
 
 =pod
