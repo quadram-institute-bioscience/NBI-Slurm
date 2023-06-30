@@ -187,10 +187,7 @@ sub joblist_to_ids {
         # Skip non numeric values
         
         next if ($row->[0] !~ /^\d+$/);
-        if ($row->[0] eq $current_slurm_jobid) {
-            say STDERR "WARNING: Skipping for deletion current job $current_slurm_jobid";
-            next;
-        }
+
         push @ids, $row->[0];
         
        
