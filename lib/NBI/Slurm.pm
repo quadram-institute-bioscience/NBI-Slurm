@@ -8,7 +8,7 @@ use NBI::Opts;
 use base qw(Exporter);
 our @ISA = qw(Exporter);
 our @EXPORT = qw(Job Opts load_config %FORMAT_STRINGS);
-$NBI::Slurm::VERSION = '0.4.6';
+$NBI::Slurm::VERSION = '0.4.7';
 
 
 
@@ -136,6 +136,16 @@ The C<NBI::Slurm> package includes the following classes:
 
 =item * L<NBI::Opts>: Represents the SLURM options for a job.
 
-=back
+=back 
+
+=head1 METHODS
+
+=over 4
+
+=item * B<load_config>
+
+Load configuration from a file.
+
+=back 
 
 Please refer to the documentation for each class for more information on their methods and usage.

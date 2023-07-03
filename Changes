@@ -1,3 +1,8 @@
+0.4.7 2023-07-02
+
+* `runjob` print JOBID to STDOUT, allowing easier chaining of jobs
+* Bugfixes
+
 0.4.6 2023-06-30
 
 * `lsjobs` updated with colored output, detailed view of single jobs, rearranged columns

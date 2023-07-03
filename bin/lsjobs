@@ -47,6 +47,11 @@ GetOptions(
     'help' => sub { usage() },
 );
 
+if (not has_squeue()) {
+
+    say STDERR RED, "Error:", RESET, " squeue not found in PATH. Are you in the cluster?";
+    exit 1;
+}
 my $jobs = getjobs();
 my @ids = ();
 for my $positional (@ARGV) {
@@ -237,7 +242,9 @@ sub render_table {
             my $stripped = $cell;
             $stripped  =~  s/\e\[[0-9;]*m//g;
             my $tmpline .= sprintf("|%-${width}s ", $stripped);
-            $tmpline =~s/$stripped/$cell/;
+            # In tmpline replace $stripped with $cell, without using regex
+            my $index = index($tmpline, $stripped);
+            substr($tmpline, $index, length($stripped), $cell);
             $line .= $tmpline;
         }
         say $line, "|";
@@ -327,6 +334,15 @@ sub prompt {
     return $answer;
 }
 
+sub has_squeue {
+    my $cmd = "squeue --version";
+    my $output = `$cmd 2>&1`;
+    if ($? == 0) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
 sub usage {
     say <<END;
   Usage: lsjobs [options] [jobid ... | pattern ]

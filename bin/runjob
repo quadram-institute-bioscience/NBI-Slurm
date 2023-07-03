@@ -116,15 +116,17 @@ if ($debug) {
     say STDERR "JOB:\n", Dumper($job);
 }
 $job->append_command($command);
-if ($verbose) {
+if ($verbose and not $run) {
     say STDERR $job->script();
 }
 
 if ($run) {
     if (my $j = $job->run()) {
-        say "Job submitted: $j";
+        say STDERR GREEN, "Job sumbitted";
+        say "$j";
     } else {
-        say "Job not submitted: $j";
+        say STDERR "Job not submitted: $j";
+        exit 1;
     }
 } else {
     say $job->script();
@@ -265,6 +267,7 @@ Submitting a job with a custom name, 2 threads, and running a Python script:
 
     runjob -n "my-job" -c 2 -r "python script.py"
 
-Printing the job script without running it:
+Chaining jobs together:
 
-    runjob "echo 'Hello, world!'"
+    JOB1=$(runjob "echo 'Hello, world!'")
+    runjob --after $JOB1 "echo 'Goodbye, world!'"
