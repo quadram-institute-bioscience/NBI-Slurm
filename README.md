@@ -1,4 +1,4 @@
-# NBI-Slurm
+# *New Batch Interface* for SLURM
 
 <a href="https://metacpan.org/dist/NBI-Slurm"><img align="right" src="docs/one-mouse.svg"  width="128"></a>
 
@@ -6,7 +6,55 @@
 [![MetaCpan](https://img.shields.io/cpan/v/NBI-Slurm)](https://metacpan.org/dist/NBI-Slurm)
 [![testers](https://img.shields.io/badge/CPAN%20Testers-status-brightgreen)](http://matrix.cpantesters.org/?dist=NBI-Slurm;maxver=1)
 
-## New Batch Interface for SLURM
+
+## Scripts
+
+* List or delete your jobs in the queue with **lsjobs**
+
+```bash
+lsjobs [options] [jobid.. | pattern ]
+```
+
+Add `-d` to delete the jobs (you will be prompted for confirmation).
+
+![lsjobs](docs/lsjobs.png)
+
+* Submit a job to the queue (with cores, memory, time, etc) with **runjob**
+
+```bash
+runjob -n "my-job" -t 2 -r -c 18 -m 32 --after "python script.py --threads 18"
+```
+
+If invoked without `--run` (or `-r`) it will print the command to be executed.
+
+![runjob](docs/runjob.png)
+
+* Wait for all jobs matching a pattern to finish (to be used to run a second job when they are all finished), with **waitjobs**
+
+```bash
+waitjobs [-u $USER] [pattern]
+```
+
+* Start an interactive session with **session**
+
+```bash
+session [-t 2 -c 18 -m 32]
+```
+
+* Who is using the cluster: list usernames and number of jobs in ascending order with **whojobs**
+
+```bash
+whojobs [--min-jobs INT]
+```
+
+## Configuration
+
+The scripts will look for a configuration file in `~/.nbislurm.config` where you can store
+your email address, default queue, and other options, as well as default parameters for 
+interactive sessions.
+See [the docs](https://metacpan.org/dist/NBI-Slurm/view/bin/configuration).
+
+## Perl Module
 
 [`NBI::Slurm`](https://metacpan.org/dist/NBI-Slurm) is a Perl package that provides a convenient interface for submitting jobs to SLURM, 
 a workload manager for *High-Performance Computing* (HPC) clusters. 
@@ -43,31 +91,6 @@ curl -L https://cpanmin.us | perl - --sudo App::cpanminus
 cpanm NBI::Slurm
 ```
 
-## Scripts
-
-* List or cancel your jobs in the queue with **lsjobs**
-
-```bash
-lsjobs [options] [jobid.. | pattern ]
-```
-
-* Submit a job to the queue (with cores, memory, time, etc) with **runjob**
-
-```bash
-runjob -n "my-job" -t 2 -r -c 18 -m 32 --after "python script.py --threads 18"
-```
-
-* Wait for all jobs matching a pattern to finish (to be used to run a second job when they are all finished), with **waitjobs**
-
-```bash
-waitjobs [-u $USER] [pattern]
-```
-
-* Who is using the cluster: list usernames and number of jobs in ascending order with **whojobs**
-
-```bash
-whojobs [--min-jobs INT]
-```
 
 ## Library Usage
 
