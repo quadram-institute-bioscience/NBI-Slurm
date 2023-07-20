@@ -13,7 +13,7 @@ GetOptions(
 );
 my $home_dir = $ENV{HOME};
 if (-e "$home_dir/.nbislurm.config") {
-
+    say STDERR "Configuration file already exists at $home_dir/.nbislurm.config";
 } else {
     my $system_tmp_dir = $ENV{TMPDIR} || '/tmp';
     say STDERR "Creating configuration file at $home_dir/.nbislurm.config";
@@ -24,7 +24,10 @@ if (-e "$home_dir/.nbislurm.config") {
 # This file is in key=value format, and can be edited manually.
 # 
 tmpdir=$system_tmp_dir
-
+# Email address to use for job submission
+email=your.email\@domain.com
+# When to be notified about job status changes: none, end, fail, all
+email_type=end,fail
 END
 }
 
