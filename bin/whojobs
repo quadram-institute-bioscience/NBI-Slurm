@@ -16,11 +16,12 @@ if (-e "$RealBin/../dist.ini") {
 } 
 
 
-my ($opt_color, $opt_no_color, $opt_min_jobs, $opt_verbose);
+my ($opt_color, $opt_no_color, $opt_min_jobs, $opt_verbose, $opt_scramble);
 GetOptions(
     'n|no-color' => \$opt_no_color,
     'm|min-jobs=i' => \$opt_min_jobs,
     'v|verbose' => \$opt_verbose,
+    's|scramble' => \$opt_scramble,
     'version' => sub { say "whojobs v", $NBI::Slurm::VERSION; exit },
     'h|help' => sub { usage() },
 );
@@ -59,7 +60,9 @@ for my $user (sort {$$slurm_users{$a} <=> $$slurm_users{$b}}keys %{$slurm_users}
         print RESET;
     }
     $p++;
-    printf "%4s %-${user_max}s %5s %2s\n", $c, $user, $slurm_users->{$user}, $star;
+    my $user_string  = $opt_scramble ? scramble_string($user, [$opt_user]) : "$user";
+    
+    printf "%4s %-${user_max}s %5s %2s\n", $c, $user_string, $slurm_users->{$user}, $star;
 }
 
 # END
@@ -107,7 +110,23 @@ sub slurm_users {
     return \%seen;
 }
 
-
+sub scramble_string {
+    # change odd chars to random chars
+    my $string = shift;
+    my $whitelist = shift;
+    return "" unless ($string);
+    my @chars = split(//, $string);
+    my $scrambled = '';
+    return $string if (grep { $string eq $_ } @{$whitelist});
+    for my $char (@chars) {
+        if (rand() > 0.5) {
+            $scrambled .= $char;
+        } else {
+            $scrambled .= chr(int(rand(26)) + 97);
+        }
+    }
+    return $scrambled;
+}
 sub get_terminal_width {
     my $terminal_width = `tput cols`;
     chomp($terminal_width);
