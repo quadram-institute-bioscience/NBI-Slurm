@@ -9,7 +9,12 @@
 
 ## Scripts
 
-* List or delete your jobs in the queue with **lsjobs**
+### lsjobs 
+
+List or delete your jobs in the queue with **lsjobs**. By default search is restricted to the active user, which can be changed 
+with `-u USER` or set to `-u all`. 
+
+See [docs](https://metacpan.org/dist/NBI-Slurm/view/bin/lsjobs)
 
 ```bash
 lsjobs [options] [jobid.. | pattern ]
@@ -19,7 +24,11 @@ Add `-d` to delete the jobs (you will be prompted for confirmation).
 
 ![lsjobs](docs/lsjobs.png)
 
-* Submit a job to the queue (with cores, memory, time, etc) with **runjob**
+### runjob
+
+Submit a job to the queue (with cores, memory, time, etc) with **runjob**. 
+
+See [docs](https://metacpan.org/dist/NBI-Slurm/view/bin/runjob)
 
 ```bash
 runjob -n "my-job" -t 2 -r -c 18 -m 32 --after "python script.py --threads 18"
@@ -29,23 +38,48 @@ If invoked without `--run` (or `-r`) it will print the command to be executed.
 
 ![runjob](docs/runjob.png)
 
-* Wait for all jobs matching a pattern to finish (to be used to run a second job when they are all finished), with **waitjobs**
+
+### waitjobs
+
+Wait for all jobs matching a pattern to finish (to be used to run a second job when they are all finished), with **waitjobs**.
+You can send it to the queue, and use its JOBID as dependency for other jobs.
+
+See [docs](https://metacpan.org/dist/NBI-Slurm/view/bin/waitjobs)
 
 ```bash
 waitjobs [-u $USER] [pattern]
 ```
 
-* Start an interactive session with **session**
+### session
+
+Start an interactive session with **session**, defaults can be saved in the configuration file.
+
+See [docs](https://metacpan.org/dist/NBI-Slurm/view/bin/session)
+
 
 ```bash
 session [-t 2 -c 18 -m 32]
 ```
 
-* Who is using the cluster: list usernames and number of jobs in ascending order with **whojobs**
+### whojobs
+
+Who is using the cluster: list usernames and number of jobs in ascending order with **whojobs**. See [docs](https://metacpan.org/dist/NBI-Slurm/view/bin/whojobs)
 
 ```bash
 whojobs [--min-jobs INT]
 ```
+
+![whojobs](docs/whojobs.png)
+
+### shelf
+
+List packages installed in the NBI HPC with **shelf**. See [docs](https://metacpan.org/dist/NBI-Slurm/view/bin/shelf)
+    
+```bash
+shelf QUERY_STRING
+```
+
+![shelf](docs/shelf.png)
 
 ## Configuration
 
