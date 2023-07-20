@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -euox pipefail
 SOURCE_BIN=/nbi/software/testing/bin/nbi-slurm
 DEST_DIR=/nbi/software/testing/
 SOURCE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+
+# Cleanup first
+RELEASES=$(find "$SOURCE_DIR" -name "NBI-Slurm-*" 2>/dev/null | wc -l)
+echo "Found $RELEASES releases"
+if [[ $RELEASES -gt 1 ]]; then
+  echo "Removing old releases"
+  rm -rf $SOURCE_DIR/NBI-Slurm-*
+fi
 
 if [[ ! -e $DEST_DIR ]]; then
 

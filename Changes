@@ -1,6 +1,25 @@
+0.4.11 2023-07-20
+
+
+
+0.4.10 2023-07-06
+
+* Bugfixes and documentation updates
+* Added `days_since_last_update` method in Slurm for cache check
+  
+0.4.9 2023-07-05
+
+* Added dependency (Storable)
+* Minor changes
+
+0.4.8 2023-07-03
+
+* Bugfix on lsjobs
+
 0.4.7 2023-07-02
 
-* `runjob` print JOBID to STDOUT, allowing easier chaining of jobs
+* `runjob` print JOBID to STDOUT, allowing easier chaining of jobs. Will warn if queue is not available.
+* Added `has_squeue()` and `@queues = queues()` to NBI::Slurm
 * Bugfixes
 
 0.4.6 2023-06-30

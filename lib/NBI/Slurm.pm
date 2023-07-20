@@ -8,7 +8,7 @@ use NBI::Opts;
 use base qw(Exporter);
 our @ISA = qw(Exporter);
 our @EXPORT = qw(Job Opts load_config %FORMAT_STRINGS);
-$NBI::Slurm::VERSION = '0.4.7';
+$NBI::Slurm::VERSION = '0.4.11';
 
 
 
@@ -58,7 +58,68 @@ sub load_config {
 }
 
 
+sub has_squeue {
+    my $cmd = "squeue --version";
+    my $output = `$cmd 2>&1`;
+    if ($? == 0) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
 
+sub queues {
+  my $can_fail = shift;
+  # Retrieve queues from SLURM
+  my $cmd = "sinfo --format '%P' --noheader";
+  my @output = `$cmd 2>/dev/null`;
+  if ($? != 0 and ! $can_fail) {
+    Carp::croak "ERROR NBI::Slurm: sinfo failed. Are you in a SLURM cluster?\n";
+  }
+  chomp @output;
+  return @output;
+}
+
+sub valid_queue {
+  my $queue = shift;
+  my @queues = queues(1);
+  my @input_queues = split(/,/, $queue);
+  foreach my $input_queue (@input_queues) {
+    if (! grep { $_ eq $input_queue } @queues) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+
+sub days_since_update {
+    my $file_path = shift;
+
+    # Check if the required modules can be loaded
+    eval {
+        require File::Spec;
+        require Time::Piece;
+        require Time::Seconds;
+    };
+    if ($@) {
+        return -1;  # Failed to load required module(s)
+    }
+
+    # Check if the file exists
+    unless (-e $file_path) {
+        return -1;  # File not found
+    }
+
+    # Get the file's last modification time
+    my $last_modified = (stat($file_path))[9];
+
+    # Calculate the number of days since the last modification
+    my $current_time = time();
+    my $days_since_update = int(($current_time - $last_modified) / (24 * 60 * 60));
+
+    return $days_since_update;
+}
 1;
 
 __END__
@@ -126,6 +187,35 @@ The L<NBI::Opts> class represents the SLURM options for the job, such as the que
 By combining the NBI::Job and NBI::Opts classes, you can easily create and submit jobs to SLURM. 
 The C<NBI::Slurm> package provides a convenient interface for interacting with SLURM and managing HPC jobs.
 
+
+=head1 METHODS
+
+=over 4
+
+=item * B<load_config>
+
+Load configuration from a file.
+
+=item * B<has_squeue>
+
+Check if the squeue command is available.
+
+=item * B<queues>
+
+Retrieve queues from SLURM.
+
+=item * B<valid_queue>
+
+Check if a queue is valid.
+
+=item * B<days_since_update>
+
+Calculate the number of days since a file was last modified.
+
+
+
+=back 
+
 =head1 CLASSES
 
 The C<NBI::Slurm> package includes the following classes:
@@ -138,14 +228,5 @@ The C<NBI::Slurm> package includes the following classes:
 
 =back 
 
-=head1 METHODS
-
-=over 4
-
-=item * B<load_config>
-
-Load configuration from a file.
-
-=back 
 
 Please refer to the documentation for each class for more information on their methods and usage.

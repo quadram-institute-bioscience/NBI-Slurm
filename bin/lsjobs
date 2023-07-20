@@ -47,7 +47,7 @@ GetOptions(
     'help' => sub { usage() },
 );
 
-if (not has_squeue()) {
+if (not NBI::Slurm::has_squeue()) {
 
     say STDERR RED, "Error:", RESET, " squeue not found in PATH. Are you in the cluster?";
     exit 1;
@@ -163,7 +163,7 @@ sub state_string {
     } else {
         $c = RED . ON_BLACK;
     }
-    return $c . $s . RESET .  ON_BLACK;
+    return $c . $s . WHITE .  ON_BLACK;
 }
 sub reason_string {
 
@@ -334,15 +334,6 @@ sub prompt {
     return $answer;
 }
 
-sub has_squeue {
-    my $cmd = "squeue --version";
-    my $output = `$cmd 2>&1`;
-    if ($? == 0) {
-        return 1;
-    } else {
-        return 0;
-    }
-}
 sub usage {
     say <<END;
   Usage: lsjobs [options] [jobid ... | pattern ]

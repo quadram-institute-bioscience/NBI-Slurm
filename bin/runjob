@@ -89,6 +89,23 @@ $name = autoname($command) unless (defined $name);
 
 my $afterok_string = defined $afterok[0] ? "-d afterok:" . join(":", @afterok) : undef;
 
+# 
+if (not NBI::Slurm::valid_queue($queue)) {
+    my @valid_queues = NBI::Slurm::queues(1);
+    if (scalar @valid_queues) {
+        say STDERR RED, BOLD, "WARNING:", RESET, " $queue is not a valid queue: ", join(", ", @valid_queues); 
+    } else {
+        if ($run) {
+            say STDERR RED, BOLD, "ERROR:", RESET, " You might be outside a slurm cluster. Run without --run to see the script.";
+            exit 1;
+        } else {
+            say STDERR RED, BOLD, "WARNING:", RESET, " You might be outside a slurm cluster";
+        }
+        
+        
+    }
+    
+}
 
 my $opts = NBI::Opts->new(
     -queue => $queue,
@@ -122,10 +139,10 @@ if ($verbose and not $run) {
 
 if ($run) {
     if (my $j = $job->run()) {
-        say STDERR GREEN, "Job sumbitted";
+        say STDERR GREEN, "Job sumbitted", RESET;
         say "$j";
     } else {
-        say STDERR "Job not submitted: $j";
+        say STDERR RED, "Job not submitted: $j", RESET;
         exit 1;
     }
 } else {
@@ -212,9 +229,10 @@ Specifies the name of the job (optional). If not provided, an automatic name wil
 Specifies the queue name for the job. The default value is "nbi-short".
 Note that if you put a "*", it will be replaced by 'short', 'medium', or 'long' depending on the time specified with '--time'.
 
-=item B<-m, --memory> INT (Gb)
+=item B<-m, --memory> INT (Mb)
 
-Specifies the amount of memory to use for the job. The default value is 8Gb.
+Specifies the amount of memory to use for the job. The default value is 8Gb. You can add a suffix like "900Mb" or "12Gb" (floats are not supported).
+An integer is interpreted as Mb if > 200, otherwise it is interpreted as Gb.
 
 =item B<-c, --cores, --threads> INT
 
@@ -223,7 +241,7 @@ Specifies the number of threads (cores) to use for the job. The default value is
 =item B<-T, --time> STR
 
 Specifies the B<time string> for the job. The default value is "C<0d 8h>". 
-The format should be in the format of "Xd Xh Xm" where X represents the number of days (d), hours (h), and minutes (m) respectively.
+The format should be in the format of "C<Xd Xh Xm>" where X represents the number of days (d), hours (h), and minutes (m) respectively.
 
 =item B<--after> INT
 
@@ -256,6 +274,8 @@ The script will look for a configuration file in the user's home directory at C<
   tmpdir=/home/user/slurm
   memory=8000
   time=3h
+
+
 
 =head1 EXAMPLES
 
