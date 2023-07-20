@@ -213,4 +213,19 @@ List users whose names contain "john":
 
   whojobs john
 
+=head1 OUTPUT
+
+The output is a terminal tabular list in ascending order of jobs:
+
+  1 uubse              1   
+  2 alkbdjbh           2   
+  3 clyimmj            2   
+  4 bwark              2   
+  5 aiivebrd           4   
+  6 telatina           4  *
+  7 kwdenpa           10   
+  8 modhs             12   
+  9 bnvdn             21   
+  0 ifroalxy          24   
+
 =back
