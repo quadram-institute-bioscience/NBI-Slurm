@@ -149,7 +149,12 @@ for my $key (keys %$cache) {
 		$result_count++;
 		$last_container = $str;
 		my $color = $provides[0] ? GREEN : YELLOW;
-		print $color, $str, RESET, "\tsource package $pack\n" ;
+		#print $color, $str, RESET, "\tsource package $pack\n" ;
+		# Print str with 30 chars max and then spaces, then \t and source package $pack
+		my $str2 = substr($str, 0, 30);
+		my $spaces = ' ' x (30 - length($str2));
+		print $color, $str2, $spaces, RESET, "\tsource package $pack\n";
+
 	}
 }
 say STDERR BLUE, "Found $result_count results", RESET if ($opt_verbose);
@@ -168,7 +173,7 @@ sub print_details {
 	my $data = shift @_;
 	say STDERR BOLD "\n== ", $data->{Application}, ' ', $data->{ApplicationVersion}, " == ", RESET, "($data->{Institute})";
 	
-	say STDERR CYAN 'Provides: ', RESET, join("\n - ", split(/,/,$data->{Provides}));
+	say STDERR CYAN "Provides:\n - ", RESET, join("\n - ", split(/,/,$data->{Provides}));
 	say STDERR CYAN 'Description: ', RESET, $data->{Description};
 	say STDERR CYAN 'Build date: ', RESET, $data->{BuildDate};
 
@@ -225,6 +230,8 @@ Prints more information about the packages.
 
 Prints the version of the script.
 
+=back
+
 =head1 OUTPUT
 
 When searching for a query string, the script will print the name and how to activate it:
@@ -233,14 +240,14 @@ When searching for a query string, the script will print the name and how to act
 
 Will produce:
 
-  MetaPhlAn       source package 9020df39-c4ad-402b-b299-896159114bd7 
+  MetaPhlAn                source package 9020df39-c4ad-402b-b299-896159114bd7 
   metaphlan2-2.7.5        source package /nbi/software/testing/bin/metaphlan2-2.7.5 
-  metaphlan-3.0   source package /ei/software/testing/bin/metaphlan-3.0 
+  metaphlan-3.0           source package /ei/software/testing/bin/metaphlan-3.0 
   metaphlan-2f1b17a1f4e9  source package /ei/software/testing/bin/metaphlan-2f1b17a1f4e9 
   metaphlan2-2.96.1       source package /ei/software/testing/bin/metaphlan2-2.96.1 
-  MetaPhlAn       source package edb34606-aeeb-41c2-890b-079c2ef1fd1c 
+  MetaPhlAn               source package edb34606-aeeb-41c2-890b-079c2ef1fd1c 
   metaphlan-3.0.13        source package /nbi/software/testing/bin/metaphlan-3.0.13 
-  metaphlan-2.0   source package /ei/software/testing/bin/metaphlan-2.0 
+  metaphlan-2.0           source package /ei/software/testing/bin/metaphlan-2.0 
   metaphlan2-2.7.8        source package /nbi/software/testing/bin/metaphlan2-2.7.8 
 
 When a singularity package ID is specified, if a manifest is found it will print the details:
@@ -255,10 +262,12 @@ Will produce:
    - read_fastx.py  
    - merge_metaphlan_tables.py  
   
-  Description: MetaPhlAn is a computational tool for profiling the composition of microbial communities (Bacteria, Archaea and Eukaryotes) from metagenomic shotgun sequencing data (i.e. not 16S) with species-level. With StrainPhlAn 3.0, it is possible to perform accurate strain-level microbial profiling. [https://github.com/biobakery/MetaPhlAn/wiki/MetaPhlAn-3.0]  
+  Description: MetaPhlAn is a computational tool for profiling the composition of microbial communities
+  (Bacteria, Archaea and Eukaryotes) from metagenomic shotgun sequencing data (i.e. not 16S) with species-level.
+  With StrainPhlAn 3.0, it is possible to perform accurate strain-level microbial profiling.
+  [https://github.com/biobakery/MetaPhlAn/wiki/MetaPhlAn-3.0]  
   
   Build date: UNK  
    
   source package 9020df39-c4ad-402b-b299-896159114bd7
 
-=back

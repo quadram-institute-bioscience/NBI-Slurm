@@ -213,6 +213,8 @@ List users whose names contain "john":
 
   whojobs john
 
+=back
+
 =head1 OUTPUT
 
 The output is a terminal tabular list in ascending order of jobs:
@@ -228,4 +230,3 @@ The output is a terminal tabular list in ascending order of jobs:
   9 bnvdn             21   
   0 ifroalxy          24   
 
-=back

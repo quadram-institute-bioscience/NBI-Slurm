@@ -8,7 +8,7 @@ use NBI::Opts;
 use base qw(Exporter);
 our @ISA = qw(Exporter);
 our @EXPORT = qw(Job Opts load_config %FORMAT_STRINGS);
-$NBI::Slurm::VERSION = '0.4.11';
+$NBI::Slurm::VERSION = '0.4.14';
 
 
 
@@ -128,17 +128,16 @@ __END__
 
 =head1 SYNOPSIS
 
-Submit jobs to SLURM using the CNBI::Job and CNBI::Opts classes.
+Submit jobs to SLURM using the L<NBI::Job> and L<NBI::Opts> classes.
 
   use NBI::Slurm;
 
 Create options for the job:
 
-my $opts = NBI::Opts->new(
-  -queue => "short",
-  -threads => 4,
-  -memory => 8,
-  
+  my $opts = NBI::Opts->new(
+    -queue => "short",
+    -threads => 4,
+    -memory => 8,
 );
 
 Create a job, using the options:
@@ -153,6 +152,9 @@ Create a job, using the options:
 Submit the job to SLURM
 
   my $jobid = $job->run;
+
+
+This package comes with a set of executable utilities.
 
 =head1 INTRODUCTION
 

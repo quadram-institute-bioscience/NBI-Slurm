@@ -28,6 +28,7 @@ my $OPT_VERBOSE;
 GetOptions(
     'c|t|threads=i' => \$CORES,
     'm|mem=s' => \$MEM_MB,
+    'd|days=i' => \$DAYS,
     'h|hours=i' => \$HOURS,
     'n|name=s' => \$NAME,
     'q|queue=s' => \$OPT_PARTITION,
@@ -40,8 +41,15 @@ GetOptions(
 
 # Get memory
 $MEM_MB = parse_memory($MEM_MB);
+
+if ($MEM_MB < 350) {
+    say STDERR RED, "[WARNING]", RESET, "Memory set to $MEM_MB Mb, automatically setting to $MEM_MB Gb", RESET;
+    $MEM_MB *= 1000;
+}
 # Get hours / days
-($DAYS, $HOURS) = hours_to_days_hours($HOURS);
+my $ADD_DAYS = 0;
+($ADD_DAYS, $HOURS) = hours_to_days_hours($HOURS);
+$DAYS += $ADD_DAYS;
 
 # Get queue
 if (not $OPT_PARTITION) {
@@ -74,6 +82,7 @@ if (has_srun() == 0) {
     say STDERR RED, "[ERROR] srun not found... Are you on the cluster?", RESET;
 }
 exec($cmd);
+
 sub partition_tag {
     my $hours = shift;
     if ($hours <= 2) {
@@ -149,13 +158,14 @@ The C<session> script allows you to start an interactive session on the cluster 
   session [options]
   
   Options:
-  -c, --threads Number of CPU cores (default: 1)
-  -m, --mem Memory size in MB (default: 1000)
-  -h, --hours Number of hours (default: 4)
-  -n, --name Job name (default: session)
-  -q, --queue Queue/partition name (default: determined by hours)
+  -c, --threads   Number of CPU cores (default: 1)
+  -m, --mem       Memory size in MB (default: 1000)
+  -h, --hours     Number of hours (default: 4)
+  -d, --days      Number of days (added to hours)
+  -n, --name      Job name (default: session)
+  -q, --queue     Queue/partition name (default: determined by hours)
   -s, --special   Enable the special parameter string from the config file (default: off)
-  -i, --intel Use Intel constraint (default: off)
+  -i, --intel     Use Intel constraint (default: off)
 
 
 =head1 OPTIONS
