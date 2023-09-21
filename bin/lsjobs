@@ -35,16 +35,17 @@ my $opt_delete_bool = 0;
 my $opt_verbose_bool = 0;
 my $opt_queue = '.+';
 my $opt_name = '.+';
-
+my $opt_tab = 0;
 GetOptions(
-    'u|user=s' => \$opt_user,
-    'n|name=s' => \$opt_name,
-    's|status=s' => \$opt_status,
+    'u|user=s'  => \$opt_user,
+    'n|name=s'  => \$opt_name,
+    's|status=s'=> \$opt_status,
     'r|running' => \$opt_running_bool,
-    'd|delete' => \$opt_delete_bool,
-    'verbose' => \$opt_verbose_bool,
-    'version' => sub { say "lsjobs v", $NBI::Slurm::VERSION; exit },
-    'help' => sub { usage() },
+    'd|delete'  => \$opt_delete_bool,
+    't|tab'     => \$opt_tab,
+    'verbose'   => \$opt_verbose_bool,
+    'version'   => sub { say "lsjobs v", $NBI::Slurm::VERSION; exit },
+    'help'      => sub { usage() },
 );
 
 if (not NBI::Slurm::has_squeue()) {
@@ -79,6 +80,12 @@ my $selected_jobs = {};
 my $selected_arrays = [['JobID', 'User', 'Queue', 'Name', 'State', 'Time', 'TotalTime', 'NodeList', 'CPUS', 'Memory', 'Reason'],
                        ['-----', '----', '-----', '----', '-----', '----', '---------', '--------', '----', '------', '------']];
 
+if ($opt_tab) {
+    # Remove separator line, add "#"
+    $selected_arrays->[0]->[0] = "#" . $selected_arrays->[0]->[0];
+    $selected_arrays = [ $selected_arrays->[0] ];
+}
+
 for my $job (sort keys %{$jobs}) {
     # Check user (full match)
     if ($jobs->{$job}->{USER} !~ /^$opt_user$/) {
@@ -107,19 +114,28 @@ for my $job (sort keys %{$jobs}) {
                  $jobs->{$job}->{USER},
                  $jobs->{$job}->{PARTITION},
                  $jobs->{$job}->{NAME},
-                 state_string($jobs->{$job}->{STATE}),
+                 $opt_tab ? $jobs->{$job}->{STATE} : state_string($jobs->{$job}->{STATE}),
                  $jobs->{$job}->{TIME},
                  $jobs->{$job}->{TIME_LIMIT},
                  $jobs->{$job}->{NODELIST},
                  $jobs->{$job}->{"CPUS"},
                  $jobs->{$job}->{"MIN_MEMORY"},
-                 reason_string($jobs->{$job}->{"REASON"}),];
+                 $opt_tab ? $jobs->{$job}->{"REASON"}  :  reason_string($jobs->{$job}->{"REASON"})
+                 ];
     push(@{$selected_arrays}, $array); 
 
 
 }
-render_table(@{$selected_arrays});
-print RESET, "\n";
+if ($opt_tab) {
+    for my $array (@{$selected_arrays}) {
+        say join("\t", @{$array});
+    }
+} else {
+    # Render default table
+    render_table(@{$selected_arrays});
+    print RESET, "\n";
+
+}
 
 ## Print single job
 if ($opt_verbose_bool and scalar @{$selected_arrays} == 3) {
@@ -347,6 +363,7 @@ sub usage {
    -s, --status <pattern>  Show only jobs with this status [default: .+]
    -r, --running           Show only running jobs
    -p, --pending           Show only pending jobs
+   -t, --tab               Output in simple TSV format (pipe to vd for interactive table)
 
    -d, --delete            Delete the selected jobs
    --verbose               Show verbose output
@@ -387,6 +404,10 @@ Show only jobs with the specified status pattern. Default: .+ (matches any statu
 =item B<-r, --running>
 
 Show only running jobs.
+
+=item B<-t, --tab>
+
+Output in simple TSV format (tip: pipe to C<vd> for interactive table)
 
 =item B<-d, --delete>
 

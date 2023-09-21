@@ -59,15 +59,16 @@ if (not $OPT_PARTITION) {
         $OPT_PARTITION = partition_tag($HOURS);
     }
 }
+
 my $PARAMS = $DEFAULT_SESSION;
-$PARAMS .= $OPT_INTEL   ? " --constraint=intel " : "";
-$PARAMS .= $OPT_SPECIAL ? " $SPECIAL_SESSION " : "";
+$PARAMS   .= $OPT_INTEL    ?  " --constraint=intel " : "";
+$PARAMS   .= $OPT_SPECIAL  ?  " $SPECIAL_SESSION "   : "";
 
 my $PARTITION //= $OPT_PARTITION;
 
 say STDERR "-" x 40;
 print STDERR YELLOW, 
-"job name    ", RESET, $NAME, "\n",
+        "job name    ", RESET, $NAME, "\n",
 YELLOW, "memory      ", RESET, $MEM_MB, " Mb\n",
 YELLOW, "cores       ", RESET, $CORES, "\n",
 YELLOW, "time        ", RESET, "$DAYS days $HOURS hours", "\n",
@@ -158,38 +159,42 @@ The C<session> script allows you to start an interactive session on the cluster 
   session [options]
   
   Options:
-  -c, --threads   Number of CPU cores (default: 1)
-  -m, --mem       Memory size in MB (default: 1000)
-  -h, --hours     Number of hours (default: 4)
-  -d, --days      Number of days (added to hours)
-  -n, --name      Job name (default: session)
-  -q, --queue     Queue/partition name (default: determined by hours)
-  -s, --special   Enable the special parameter string from the config file (default: off)
-  -i, --intel     Use Intel constraint (default: off)
+    -c  --threads   Number of CPU cores (default: 1)
+    -m  --mem       Memory size in MB (default: 1000)
+    -h  --hours     Number of hours (default: 4)
+    -d  --days      Number of days (added to hours)
+    -n  --name      Job name (default: session)
+    -q  --queue     Queue/partition name (default: determined by hours)
+    -s  --special   Enable the special parameter string from the config file (default: off)
+    -i  --intel     Use Intel constraint (default: off)
 
 
 =head1 OPTIONS
 
 =over 4
 
-=item B<-c, --threads>
+=item B<-c, --threads> INT
 
 Number of CPU cores. By default, it is set to 1.
 
-=item B<-m, --mem>
+=item B<-m, --mem> STRING|INT
 
 Memory size. If an integer is given, it's used as memory in MB. Specify "dddGB" to set memory in GB. 
-By default it is set to 1000.
+By default it is set to 1000, which is 1GB. If a number <=200 is provided, it will be used as GB.
 
-=item B<-h, --hours>
+=item B<-h, --hours> INT
 
 Number of hours. By default, it is set to 4.
 
-=item B<-n, --name>
+=item B<-d, --days> INT
+
+Number of days. Default is 0, and can be omitted (hours will update the days)
+
+=item B<-n, --name> STRING
 
 Job name. By default, it is set to "session".
 
-=item B<-q, --queue>
+=item B<-q, --queue> STRING
 
 Queue/partition name.
 

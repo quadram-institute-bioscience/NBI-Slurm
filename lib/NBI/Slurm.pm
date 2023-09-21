@@ -8,7 +8,7 @@ use NBI::Opts;
 use base qw(Exporter);
 our @ISA = qw(Exporter);
 our @EXPORT = qw(Job Opts load_config %FORMAT_STRINGS);
-$NBI::Slurm::VERSION = '0.4.14';
+$NBI::Slurm::VERSION = '0.6.1';
 
 
 
@@ -120,6 +120,7 @@ sub days_since_update {
 
     return $days_since_update;
 }
+
 1;
 
 __END__
