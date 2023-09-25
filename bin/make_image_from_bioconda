@@ -11,7 +11,7 @@ my $output  = undef;
 my $move   = 0;
 my $def_file = undef;
 my $dest = '/qib/platforms/Informatics/transfer/outgoing/singularity/core/';
-
+my $verbose = 0;
 GetOptions(
     'o|output=s'  => \$output,
     'd|def=s'     => \$def_file,
@@ -55,8 +55,8 @@ if ( defined $def_file and -e $def_file) {
         'version' => $version,
     };
     my $def = fill_template($def_template, $data);
-
-    my $tmp_file = $ENV{TMPDIR} // '/tmp' . '/' . $package . '.def';
+    my $rand_str = rand_string(38);
+    my $tmp_file = $ENV{TMPDIR} // '/tmp' . '/' . $package . '_' . $rand_str . '.def';
     open(my $fh, ">", $tmp_file);
     print $fh $def;
     close $fh;
@@ -65,8 +65,11 @@ if ( defined $def_file and -e $def_file) {
     say STDERR "Definition file created at $def_file.";
 }
 
-my $cmd = "sudo singularity build $output $def_file";
+my $cmd = "sudo singularity build $output $def_file 2>&1 > $def_file.log";
 
+# Execute cmd redirecting STDERR to STDOUT and STDOUT to a file
+# This is to avoid the error message from micromamba
+# "WARNING: apt does not have a stable CLI interface. Use with caution in scripts."
 if (system($cmd) != 0) {
     die "Error building image.\n";
 } 
@@ -139,16 +142,32 @@ From: mambaorg/micromamba:latest
     echo "[4] Clean environment"
     micromamba clean --all --yes
     echo "[5] Create binaries list: /etc/binaries.txt"
-    comm <(sort /list_all.txt) <(sort /list_deps.txt) -2 -3 | sort > /etc/binaries.txt
+    sort /list_all.txt > /tmp/list_all.txt
+    sort /list_deps.txt > /tmp/list_deps.txt
+    comm /tmp/list_all.txt /tmp/list_deps.txt -2 -3 | sort > /etc/binaries.txt
     rm /list_all.txt /list_deps.txt
+    rm /tmp/*txt
     echo "[6] Finalize"
     {post:=#Nothing to add}
 
 %environment
     export PATH=/opt/conda/envs/package_env/bin:$PATH
+
 EOF
 
 return $template;
+}
+
+sub rand_string {
+    my $valid_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    my $length = shift;
+    my $random_string = "";
+    my $num_chars = length($valid_chars);
+    for (my $i = 0; $i < $length; $i++) {
+        my $random_position = int(rand($num_chars));
+        $random_string .= substr($valid_chars, $random_position, 1);
+    }
+    return $random_string;
 }
 __END__
 

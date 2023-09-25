@@ -1,3 +1,13 @@
+0.6.3  2023-09-24
+
+* Minor update to `shelf`: JSON errors will be quietly ignored if --refresh is set
+
+
+0.6.2  2023-09-22
+
+* Bug fix in `shelf`
+* Improvements to `make_package`
+
 0.6.1  2023-09-02
 
 * Minor improvements in `make_image_from_bioconda` and `make_package`
