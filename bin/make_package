@@ -38,6 +38,7 @@ if ($opt_help) {
 
 # Determine the package name
 $package = get_package_name($image, $package);
+say STDERR "Package name: $package";
 
 # Create the package
 my $package_bin   = File::Spec->catfile($packages_dir, $package);
@@ -66,6 +67,7 @@ print $exec "#!/bin/bash\n";
 print $exec "# Launcher for $package made by Core Bioinformatics\n";
 print $exec "singularity exec \"$abs_img\" " . '$(basename "$0") "$@"' . "\n";
 close $exec;
+say STDERR "Launcher created: $source_file";
 
 if (chmod($permissions, $source_file)) {
     print "Permissions of '$source_file' changed to 755.\n";
@@ -75,9 +77,22 @@ if (chmod($permissions, $source_file)) {
 
 # Create symbolic links for the provided commands
 my @COMMANDS = `singularity exec \"$image\" cat /etc/binaries.txt`;
+if ($? != 0) {
+    say STDERR "ERROR: Failed to read /etc/binaries.txt from image.";
+    say STDERR "  -> Are you sure this is a valid Singularity image?";
+    exit 1;
+} elsif (scalar @COMMANDS == 0) {
+    say STDERR "ERROR: No commands supplied (or no /etc/binaries.txt found).";
+} else {
+   for my $i (0 .. $#COMMANDS) {
+       chomp $COMMANDS[$i];
+       $COMMANDS[$i] =~ s/^\s+|\s+$//g;
+   }
+   say STDERR "Commands: ", join(", ", @COMMANDS);
+}
 push(@COMMANDS, @ARGV) if @ARGV;
 
-for my $command (@ARGV) {
+for my $command (@COMMANDS) {
     say " - $command";
     my $symlink_name = File::Spec->catfile($package_path, $command);
     if (-e $symlink_name and $force) {

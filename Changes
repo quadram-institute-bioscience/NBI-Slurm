@@ -1,7 +1,12 @@
+0.7.0  2023-10-01
+
+* `make_image_from_bioconda` now supports multiple packages [experimental]
+* `make_package` will now read the binaries from images, if made with make_image_from_bioconda
+* Improved `shelf`
+
 0.6.3  2023-09-24
 
 * Minor update to `shelf`: JSON errors will be quietly ignored if --refresh is set
-
 
 0.6.2  2023-09-22
 

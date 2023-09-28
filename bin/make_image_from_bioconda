@@ -6,7 +6,7 @@ use v5.12;
 use warnings;
 use Getopt::Long qw(:config no_ignore_case);
 use Pod::Usage;
-
+use Term::ANSIColor qw(:constants);
 my $output  = undef;
 my $move   = 0;
 my $def_file = undef;
@@ -15,27 +15,60 @@ my $verbose = 0;
 GetOptions(
     'o|output=s'  => \$output,
     'd|def=s'     => \$def_file,
+    'dest=s'      => \$dest,
     'm|move'      => \$move,
+    'v|verbose'   => \$verbose,
 );
-my ($package, $version) = @ARGV;
 
-if ( ! -d $dest ) {
-    die "Destination directory $dest does not exist.\n";
-}
-if (not defined $package) {
+my $packages = '';
+if (scalar @ARGV == 0) {
+    say STDERR "No package provided." if $verbose;
     pod2usage(-verbose => 1);
 }
+say STDERR "Preparing definition for ", scalar @ARGV, " packages." if $verbose;
+for my $package_str (@ARGV) {
+    my $package = '';
+    my $version = '';
+    my $requirement = '';
 
-$version = last_ver($package) if not defined $version;
+    if ($package_str =~ /(.*)(=|>|>=)(.*)/) {
+        $package = $1;
+        $requirement = $2;
+        $version = "=$3";
+        say STDERR "- Adding package ", BOLD, $package, RESET, ", version [$requirement] $version" if $verbose;
 
-if (not defined $output) {
-    $output = $package . '__' . $version . '.simg';
+    } else {
+        $package = $package_str;
+        my $v = last_ver($package);
+        if (scalar @ARGV == 1) {
+            $version = "$v";
+            $requirement = '=';
+        }
+        say "- Adding package ", BOLD, $package, RESET, ", last version would be $v" if $verbose;
+    }
+
+    if (not defined $output) {
+            die "Package name not defined.\n" if $package eq '';
+            my $v = $version ne '' ? $version : 'last';
+            $output = $package . '__' . $v. '.simg';
+            say STDERR "- Setting output file to $output (first package)" if $verbose;  
+    }
+    $packages .= qq("${package}${requirement}${version}" );
+
 }
+
+
+if ( ! -d $dest ) {
+    say STDERR RED, "[ERROR]", RESET;
+    die "Destination directory $dest does not exist.\n";
+}
+
+
+
 
 say STDERR "
 ==============================
-Package:     $package
-Version:     $version
+Package(s):  $packages
 Output:      $output
 Destination: $dest/$output
 ==============================
@@ -51,12 +84,12 @@ if ( defined $def_file and -e $def_file) {
 } else {
     my $def_template = template();
     my $data = {
-        'package' => $package,
-        'version' => $version,
+        'packages' => $packages,
     };
     my $def = fill_template($def_template, $data);
     my $rand_str = rand_string(38);
-    my $tmp_file = $ENV{TMPDIR} // '/tmp' . '/' . $package . '_' . $rand_str . '.def';
+    my $tmp_file = $ENV{TMPDIR} // '/tmp' . '/' . $output . '_' . $rand_str . '.def';
+    say STDERR "Creating temporary definition file at $tmp_file." if $verbose;
     open(my $fh, ">", $tmp_file);
     print $fh $def;
     close $fh;
@@ -129,15 +162,15 @@ Bootstrap: docker
 From: mambaorg/micromamba:latest
 
 %post
-    #Preparing container for: {package} {version}
+    #Preparing container for: {packages} 
     # Core Bioinformatics, using NBI::Slurm
     echo "[1] Create environment"
     micromamba create --yes -p /opt/conda/envs/package_env/
     echo "[2] Install package dependencies"
-    micromamba install --yes --only-deps --prefix /opt/conda/envs/package_env/ -c conda-forge -c bioconda -c defaults {package}={version}
+    micromamba install --yes --only-deps --prefix /opt/conda/envs/package_env/ -c conda-forge -c bioconda -c defaults {packages}
     ls /opt/conda/envs/package_env/bin > /list_deps.txt
     echo "[3] Install package"
-    micromamba install --yes --prefix /opt/conda/envs/package_env/ -c conda-forge -c bioconda -c defaults {package}={version}
+    micromamba install --yes --prefix /opt/conda/envs/package_env/ -c conda-forge -c bioconda -c defaults {packages}
     ls /opt/conda/envs/package_env/bin > /list_all.txt
     echo "[4] Clean environment"
     micromamba clean --all --yes
@@ -175,11 +208,13 @@ __END__
 
 =head1 DESCRIPTION
 
-Create a Singularity/Apptainer image from a single micromamba package
+Create a Singularity/Apptainer image from a single micromamba package.
+
+Multiple packages can be provided, but it's recommended to decide a sensible output name in that case.
 
 =head1 SYNOPSIS
 
-    make_image [options] package_name package_version
+    make_image_from_bioconda [options] packageName=version ...
 
 =head1 OPTIONS
 
@@ -187,15 +222,25 @@ Create a Singularity/Apptainer image from a single micromamba package
 
 =item B<-o, --output> I<FILENAME>
 
-The name of the output image file. Default: singularity.simg
+The name of the output image file. Default: package__version.simg
 
 =item B<-d, --def> I<FILENAME>
 
-The name of the definition file [optional]
+The name of the definition file [optional, experimental]
 
 =item B<-m, --move>
 
-Move to the Core Bioinformatics repository
+Move to the Core Bioinformatics repository after building.
+See the C<--dest> option.
+
+=item B<--dest> I<PATH>
+
+The destination directory for the image file. 
+Default: /qib/platforms/Informatics/transfer/outgoing/singularity/core/
+
+=item B<-v, --verbose>
+
+Verbose output
 
 =back
 

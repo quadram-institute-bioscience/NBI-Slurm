@@ -79,6 +79,7 @@ if ($opt_refresh or not -e $cache_file) {
 			my @files = <$location$stage/bin/*>;
 			for my $file (@files) {
 				my $pack = basename($file);
+				say STDERR "[add-legacy] $pack" if ($opt_verbose);
 				$cache->{$pack} = $file;
 				#if ($search eq $pack) {
 				#	print GREEN, BOLD, $pack, RESET, "\tsource package $file\n" ;
@@ -92,7 +93,7 @@ if ($opt_refresh or not -e $cache_file) {
 	}
 
 	for my $location (@locations) {
-		say STDERR BLUE, "\t modern: $location", RESET if ($opt_verbose);
+		say STDERR BLUE, "\t modern: ", RESET, " $location" if ($opt_verbose);
 		#last if ($opt_legacy);	
 		#if (defined $opt_inst) {
 		#	next unless $location =~/$opt_inst/i;
@@ -264,7 +265,7 @@ When searching for a query string, the script will print the name and how to act
 
 Will produce:
 
-  MetaPhlAn                source package 9020df39-c4ad-402b-b299-896159114bd7 
+  MetaPhlAn               source package 9020df39-c4ad-402b-b299-896159114bd7 
   metaphlan2-2.7.5        source package /nbi/software/testing/bin/metaphlan2-2.7.5 
   metaphlan-3.0           source package /ei/software/testing/bin/metaphlan-3.0 
   metaphlan-2f1b17a1f4e9  source package /ei/software/testing/bin/metaphlan-2f1b17a1f4e9 
