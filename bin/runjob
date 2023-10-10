@@ -43,7 +43,7 @@ GetOptions(
     'm|memory=s'    => \$memory,
     'c|cores|threads=i' => \$threads,
     'q|queue=s'     => \$queue,
-    't|time=s'      => \$time,
+    'T|t|time=s'      => \$time,
     'w|tmpdir=s'    => \$tmpdir,
     'n|name=s'      => \$name,
     'r|run'         => \$run,
@@ -53,7 +53,7 @@ GetOptions(
     'verbose'       => \$verbose,
     'version'       => sub { say "runjob v", $NBI::Slurm::VERSION; exit },
     'debug'         => \$debug,
-    'help'          => sub { usage() },
+    'help'          => sub { usage(1) },
 ) or usage(1);
 
 $debug = 1 if ($ENV{"DEBUG"});
@@ -61,7 +61,7 @@ $debug = 1 if ($ENV{"DEBUG"});
 my $time_hours = NBI::Opts::_time_to_hour($time);
 $queue = update_queue($queue, $time_hours);
 $command = join(" ", @ARGV);
-usage(1) unless ( $command);
+usage(1) unless ($command);
 
 # Check threadshours
 if (-d $time) {
@@ -124,6 +124,8 @@ if ($verbose) {
     say STDERR $opts->view();
 }
 
+
+# If the command starts with a number, it might be a typo like -t 8h instead
 my $job = NBI::Job->new(
     -name => $name,
     -command =>  "cd \"$user_current_dir\"",
@@ -238,7 +240,7 @@ An integer is interpreted as Mb if > 200, otherwise it is interpreted as Gb.
 
 Specifies the number of threads (cores) to use for the job. The default value is 1.
 
-=item B<-T, --time> STR
+=item B<-t, --time> STR
 
 Specifies the B<time string> for the job. The default value is "C<0d 8h>". 
 The format should be in the format of "C<Xd Xh Xm>" where X represents the number of days (d), hours (h), and minutes (m) respectively.

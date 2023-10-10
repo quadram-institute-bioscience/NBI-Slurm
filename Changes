@@ -1,8 +1,14 @@
+0.7.1  2023-10-09
+
+* Minor bugfix in `make_image_from_bioconda` to improve default output name and messages
+* Added --dry in `make_image_from_bioconda` to test the command without running it
+
 0.7.0  2023-10-01
 
 * `make_image_from_bioconda` now supports multiple packages [experimental]
 * `make_package` will now read the binaries from images, if made with make_image_from_bioconda
 * Improved `shelf`
+* Some tests wont run on Windows
 
 0.6.3  2023-09-24
 

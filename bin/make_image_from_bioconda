@@ -12,11 +12,13 @@ my $move   = 0;
 my $def_file = undef;
 my $dest = '/qib/platforms/Informatics/transfer/outgoing/singularity/core/';
 my $verbose = 0;
+my $dry = 0;
 GetOptions(
     'o|output=s'  => \$output,
     'd|def=s'     => \$def_file,
     'dest=s'      => \$dest,
     'm|move'      => \$move,
+    'd|dry'       => \$dry,
     'v|verbose'   => \$verbose,
 );
 
@@ -32,17 +34,25 @@ for my $package_str (@ARGV) {
     my $requirement = '';
 
     if ($package_str =~ /(.*)(=|>|>=)(.*)/) {
+        # Package with version requirement
         $package = $1;
         $requirement = $2;
-        $version = "=$3";
+        $version = "$3";
         say STDERR "- Adding package ", BOLD, $package, RESET, ", version [$requirement] $version" if $verbose;
 
     } else {
+        # Package without version requirement. Get last version if only one package is provided
         $package = $package_str;
         my $v = last_ver($package);
+        if ($v eq '') {
+            die "Error retrieving last version for $package.\n";
+        }
         if (scalar @ARGV == 1) {
             $version = "$v";
             $requirement = '=';
+            say STDERR " - Package $package will default to last ver $v" if $verbose;
+        } else {
+            say STDERR " - Package $package has no version requirement" if $verbose;
         }
         say "- Adding package ", BOLD, $package, RESET, ", last version would be $v" if $verbose;
     }
@@ -66,13 +76,14 @@ if ( ! -d $dest ) {
 
 
 
-say STDERR "
-==============================
+say STDERR GREEN, "
+Make image from Bioconda
+==============================", RESET, "
 Package(s):  $packages
-Output:      $output
-Destination: $dest/$output
-==============================
-";
+Output:      $output";
+print STDERR "Destination: $dest" if $move;
+print STDERR GREEN, "\n==============================
+", RESET;
 
 if ( ! connected() ) {
     say STDERR "[WARNING] Not connected to the internet, are you in the software node?";
@@ -98,8 +109,13 @@ if ( defined $def_file and -e $def_file) {
     say STDERR "Definition file created at $def_file.";
 }
 
-my $cmd = "sudo singularity build $output $def_file 2>&1 > $def_file.log";
+my $cmd = "sudo singularity build \"$output\" \"$def_file\" 2>&1 > \"$def_file.log\"";
 
+if ($dry) {
+    say STDERR "Dry run, not executing command.";
+    say STDERR $cmd;
+    exit;
+}
 # Execute cmd redirecting STDERR to STDOUT and STDOUT to a file
 # This is to avoid the error message from micromamba
 # "WARNING: apt does not have a stable CLI interface. Use with caution in scripts."
@@ -108,22 +124,31 @@ if (system($cmd) != 0) {
 } 
 
 if ($move) {
-    my $mv_cmd = "mv $output $dest";
+    my $mv_cmd = "mv \"$output\" \"$dest\"";
     if (system($mv_cmd) != 0) {
         die "Error moving image to $dest.\n";
     }
 }
+
+print STDERR "Output: $dest\n";
+print STDERR "Log:    $def_file.log\n";
+
 sub last_ver {
     my $channel = 'bioconda';
     my $package = shift;
     my $answer = `curl --silent -X GET --header 'Accept: application/json' 'https://api.anaconda.org/package/$channel/$package'| grep latest_version | cut -f4 -d\\"`;
+    # Check if the answer is a version number
+    if ($answer !~ /\d/) {
+        say STDERR RED, "Error", RESET, ": retrieving last version for $package: $answer";
+        return '';
+    }
     chomp($answer);
     return $answer;
 
 }
 
 sub connected {
-    my $cmd = "curl ifconfig.me";
+    my $cmd = "curl --silent ifconfig.me";
     my $ip = `$cmd`;
     if ($ip =~/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/) {
         return 1;
