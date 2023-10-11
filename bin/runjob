@@ -120,8 +120,26 @@ my $opts = NBI::Opts->new(
 
 
 if ($verbose) {
-    say STDERR "CONFIG:\n", Dumper($config);
+    say STDERR GREEN, "CONFIG:\n", RESET;
+    xdump($config);
+    print STDERR "\n";
+    #say STDERR GREEN, "OPTS:\n", RESET;
     say STDERR $opts->view();
+}
+
+
+sub xdump {
+    my ($hash_of_hashes, $indent) = @_;
+    $indent //= '  ';
+    while (my ($key, $value) = each %$hash_of_hashes) {
+        if (ref $value eq 'HASH') {
+            print STDERR BOLD, "$indent$key :\n", RESET;
+            xdump($value, "$indent    ");
+            print "$indent\n";
+        } else {
+            print STDERR "$indent$key = $value\n";
+        }
+    }
 }
 
 
@@ -132,25 +150,45 @@ my $job = NBI::Job->new(
     -opts => $opts
 );
 if ($debug) {
-    say STDERR "JOB:\n", Dumper($job);
+    say STDERR YELLOW, "JOB:\n", RESET, Dumper($job);
 }
 $job->append_command($command);
 if ($verbose and not $run) {
+    say STDERR GREEN, "JOB SCRIPT\n", RESET;
     say STDERR $job->script();
 }
 
+
+my $err = 0;
 if ($run) {
+    
     if (my $j = $job->run()) {
-        say STDERR GREEN, "Job sumbitted", RESET;
+        
+        if ($verbose) {
+            #say STDERR GREEN, "JOB OBJECT:\n", RESET;
+            say STDERR $job->view();
+        }
+
         say "$j";
     } else {
         say STDERR RED, "Job not submitted: $j", RESET;
-        exit 1;
+        if ($verbose) {
+            #say STDERR RED, "JOB OBJECT:\n", RESET;
+            say STDERR $job->view();
+        }
+        $err = 1;
     }
 } else {
+    say STDERR GREEN, "JOB SCRIPT:\n", RESET;
     say $job->script();
 }
 
+
+if ($err) {
+    exit 1;
+} else {
+    say STDERR GREEN, "Job sumbitted: ", $job->jobid, RESET, "\t(", $job->name, ")", RESET;
+}
 sub usage {
     say STDERR <<END;
 
@@ -173,13 +211,23 @@ END
 sub autoname {
     my $string = shift;
     my @parts = split(/\s+/, $string);
-    my @ints = ["bash", "perl", "python", "python3", "R", "Rscript", "sh", "zsh"];
-    # If the first part is in ints, use the second item as name
-    if (grep {$_ eq $parts[0]} @ints) {
+    my @ints = ("bash", "perl", "python", "python3", "R", "Rscript", "sh", "zsh");
+    my @subs = ("bwa", "samtools", "seqfu", "seqkit", "bedtools", "taxonkit", "kmcp", "seqtk", "usearch", "vsearch");
+    
+    # From each @parts, replace it with the first [A-Za-z0-9]+ part
+    for my $i (0..$#parts) {
+        $parts[$i] =~ /^([A-Za-z0-9]+)/;
+        $parts[$i] = $1;
+    }
+    # check if $fisrt is part of the @int array of strings
+    if (grep {$_ eq $parts[0]} @ints and defined $parts[1]) {
         return $parts[1];
+    } elsif (grep {$_ eq $parts[0]} @subs and defined $parts[1]) {
+        return $parts[0] . "-" . $parts[1];
     } else {
         return $parts[0];
     }
+
 }
 
 

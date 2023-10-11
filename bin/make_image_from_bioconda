@@ -7,10 +7,14 @@ use warnings;
 use Getopt::Long qw(:config no_ignore_case);
 use Pod::Usage;
 use Term::ANSIColor qw(:constants);
+use NBI::Slurm;
+
+my $config = NBI::Slurm::load_config("$USER/.nbislurm.config");
 my $output  = undef;
 my $move   = 0;
 my $def_file = undef;
-my $dest = '/qib/platforms/Informatics/transfer/outgoing/singularity/core/';
+my $dest = $config->{'default_dest'} // '/qib/platforms/Informatics/transfer/outgoing/singularity/core/';
+my $temporary_directory = $config->{'tmpdir'} // $ENV{TMPDIR} // '/tmp';
 my $verbose = 0;
 my $dry = 0;
 GetOptions(
@@ -27,6 +31,10 @@ if (scalar @ARGV == 0) {
     say STDERR "No package provided." if $verbose;
     pod2usage(-verbose => 1);
 }
+
+say STDERR BOLD, GREEN, "Make image from Bioconda
+============================================================", RESET;
+
 say STDERR "Preparing definition for ", scalar @ARGV, " packages." if $verbose;
 for my $package_str (@ARGV) {
     my $package = '';
@@ -77,12 +85,11 @@ if ( ! -d $dest ) {
 
 
 say STDERR GREEN, "
-Make image from Bioconda
-==============================", RESET, "
+============================================================", RESET, "
 Package(s):  $packages
 Output:      $output";
 print STDERR "Destination: $dest" if $move;
-print STDERR GREEN, "\n==============================
+print STDERR GREEN, "\n============================================================
 ", RESET;
 
 if ( ! connected() ) {
@@ -99,7 +106,7 @@ if ( defined $def_file and -e $def_file) {
     };
     my $def = fill_template($def_template, $data);
     my $rand_str = rand_string(38);
-    my $tmp_file = $ENV{TMPDIR} // '/tmp' . '/' . $output . '_' . $rand_str . '.def';
+    my $tmp_file = $temporary_directory . '/' . $output . '_' . $rand_str . '.def';
     say STDERR "Creating temporary definition file at $tmp_file." if $verbose;
     open(my $fh, ">", $tmp_file);
     print $fh $def;
@@ -189,23 +196,34 @@ From: mambaorg/micromamba:latest
 %post
     #Preparing container for: {packages} 
     # Core Bioinformatics, using NBI::Slurm
-    echo "[1] Create environment"
+    echo  "[1] Create environment"
     micromamba create --yes -p /opt/conda/envs/package_env/
-    echo "[2] Install package dependencies"
+
+    # echo -e in BOLD "ciao" then reset color
+    echo  "[2] Install package dependencies"
     micromamba install --yes --only-deps --prefix /opt/conda/envs/package_env/ -c conda-forge -c bioconda -c defaults {packages}
-    ls /opt/conda/envs/package_env/bin > /list_deps.txt
-    echo "[3] Install package"
+    touch /list_deps.txt
+    if [[ -e /opt/conda/envs/package_env/bin ]]; then
+      ls /opt/conda/envs/package_env/bin > /list_deps.txt
+    fi
+      
+    echo  "[3] Install package"
     micromamba install --yes --prefix /opt/conda/envs/package_env/ -c conda-forge -c bioconda -c defaults {packages}
-    ls /opt/conda/envs/package_env/bin > /list_all.txt
-    echo "[4] Clean environment"
+    touch  /list_all.txt
+    if [[ -d "/opt/conda/envs/package_env/bin" ]]; then
+      ls /opt/conda/envs/package_env/bin > /list_all.txt
+    fi
+
+    echo  "[4] Clean environment"
     micromamba clean --all --yes
-    echo "[5] Create binaries list: /etc/binaries.txt"
+    echo  "[5] Create binaries list: /etc/binaries.txt"
     sort /list_all.txt > /tmp/list_all.txt
     sort /list_deps.txt > /tmp/list_deps.txt
     comm /tmp/list_all.txt /tmp/list_deps.txt -2 -3 | sort > /etc/binaries.txt
     rm /list_all.txt /list_deps.txt
     rm /tmp/*txt
-    echo "[6] Finalize"
+    echo  "[6] Finalize: list"
+    cat /etc/binaries.txt
     {post:=#Nothing to add}
 
 %environment
@@ -261,7 +279,8 @@ See the C<--dest> option.
 =item B<--dest> I<PATH>
 
 The destination directory for the image file. 
-Default: /qib/platforms/Informatics/transfer/outgoing/singularity/core/
+Default: /qib/platforms/Informatics/transfer/outgoing/singularity/core/,
+or C<default_dest> in the configuration.
 
 =item B<-v, --verbose>
 

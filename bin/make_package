@@ -9,12 +9,14 @@ use File::Basename;
 use File::Path qw(make_path);
 use File::Spec;
 use Pod::Usage;
+use NBI::Slurm;
 
+my $config    = NBI::Slurm::load_config("$USER/.nbislurm.config");
 my $image     = undef;
 my $package   = undef;
 my $force     = 0;
-my $packages_dir     = '/nbi/software/testing/bin/';
-my $packages_basepath = '/nbi/software/testing/';
+my $packages_dir      = $config->{'packages_dir'} // '/nbi/software/testing/bin/';
+my $packages_basepath = $config->{'packages_basepath'} // '/nbi/software/testing/';
 my $permissions = 0755;
 my $opt_help;
 
@@ -199,13 +201,20 @@ Force overwriting existing binary or package path if they already exist.
 List of binaries shipping with the package, they will all be linked to the same launcher script. 
 At least a "command" is required.
 
+Note that images created from C<make_image_from_bioconda> will have a list of binaries in C</etc/binaries.txt>, automatically
+used to create the links.
+
 =back
 
 =head1 EXAMPLE
 
+To install a package from a Singularity image called C<seqfu__1.20.0.simg> 
+with the binaries C<seqfu>, C<fu-orf>, C<fu-msa>, C<fu-rename> and C<fu-tabcheck>:
+
   make_package -i seqfu__1.20.0.simg seqfu fu-orf fu-msa fu-rename fu-tabcheck 
 
-Will generate links to seqfu, fu-orf, fu-msa, fu-rename and fu-tabcheck in the package C<seqfu>, using the specified image (seqfu__1.20.0.simg).
+If the image was generated, you can simply:
 
+  make_package -i seqfu__1.20.0.simg
 
 =cut
