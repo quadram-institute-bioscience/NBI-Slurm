@@ -102,7 +102,7 @@ sub new {
     $self->email_address = defined $email_address ? $email_address : undef;
     $self->email_type = defined $email_when ? $email_when : "none";
     # Set options
-    $self->opts = defined $opts_array ? $opts_array : [];
+    $self->opts = defined $$opts_array[0] ? $opts_array : [];
     
     
     
@@ -198,7 +198,7 @@ sub view {
     $str .= " tmpdir:\t" . $self->{tmpdir} . "\n";
     $str .= " ---------------------------\n";
     for my $o (@{$self->{opts}}) {
-        $str .= "#SBATCH $o\n";
+        $str .= "#SBATCH $o\n" if defined $o;
     }
     return $str;
 }
