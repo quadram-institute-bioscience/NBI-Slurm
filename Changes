@@ -1,3 +1,9 @@
+0.8.0  2023-10-12
+
+* Improved `runjob` verbose output and automatic naming
+* Added view() method to NBI::Job
+* Updated documentation and bugfixes
+
 0.7.1  2023-10-09
 
 * Minor bugfix in `make_image_from_bioconda` to improve default output name and messages
