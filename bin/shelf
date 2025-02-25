@@ -160,8 +160,14 @@ for my $key (keys %$cache) {
 		eval {
 		 $ver = $data->{ApplicationVersion} ? " " .  $data->{ApplicationVersion} : "";
 		};
-                $str2.=$ver;
+        $str2.=$ver;
 		my $spaces = ' ' x (30 - length($str2));
+		if ($str2 =~/__/) {
+			$str2 = substr($str2, 0, index($str2, '__'));
+			$str2 .= ' ' . MAGENTA;
+			$str2 .= substr($str, index($str, '__')+2) . RESET;
+		}
+		
 		print $color, $str2, $spaces, RESET, "\tsource package $pack\n";
 	}
 }

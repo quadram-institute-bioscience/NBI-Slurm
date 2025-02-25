@@ -60,6 +60,7 @@ session_hours=12
 # IMAGES FOR HPC
 
 # Default destination when --move an image
+# Should be a place readable by all users in the HPC cluster
 default_dest=/qib/platforms/Informatics/transfer/outgoing/singularity/core/
 
 # Where to place the package
