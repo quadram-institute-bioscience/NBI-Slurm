@@ -1,3 +1,7 @@
+0.12.0  2025-02-25
+
+* Added utilities `printslurm` and `printpath`
+
 0.11.0  2025-02-25
 
 * Added `rm_package` to remove a "legacy" package
