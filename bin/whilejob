@@ -26,7 +26,7 @@ my $opt_user         = $ENV{USER};
 my $opt_command      = '';
 my $opt_verbose_bool = 0;
 my $opt_debug_bool   = 0;
-
+my $opt_stderr_bool  = 0;
 # Check if this script is running as a job, save the job id if so
 my $self_job_id = $ENV{SLURM_JOB_ID} // undef;
 
@@ -35,16 +35,20 @@ my $gtopt = GetOptions(
     'j|i|id|jobid=i' => \$opt_jobid,
     't|time=s'       => \$opt_time_string,
     'u|user=s'       => \$opt_user,
+    'stderr'         => \$opt_stderr_bool,
     'verbose'        => \$opt_verbose_bool,
     'version'        => sub { say "whilejob v", $NBI::Slurm::VERSION; exit },
     'debug'          => \$opt_debug_bool,
     'help'           => sub { usage(1) },  # Fixed: pass 1 to exit after help
 );
 
+my $redirect = $opt_stderr_bool ? '2>&1' : '2>/dev/null';
+
 # Check for command line parsing errors
 if (!$gtopt) {
-    print STDERR timelog("whilejob"), "Error in command line arguments\n";
-    usage(0);
+  usage(0);
+  print STDERR timelog("whilejob"), "Error in command line arguments\n";
+  exit;  
 }
 
 # Input validation
@@ -52,8 +56,9 @@ my $interval_seconds = timestring_to_seconds($opt_time_string);
 my $command = join(' ', @ARGV);
 
 if ($opt_jobid < 0) {
-    print STDERR timelog("whilejob"), "Job ID must be a positive integer\n";
     usage(0);
+    print STDERR timelog("whilejob"), "Job ID must be a positive integer\n";
+    exit;
 }
 
 if ($command eq '') {
@@ -94,35 +99,36 @@ while (1) {
     # Execute the user's command
     my $output;
     eval {
-        $output = `$command 2>&1`;
+        $output = `$command $redirect`;
         my $exit_code = $? >> 8;
         
         if ($exit_code != 0) {
-            print STDERR RED, timelog("whilejob"), RESET, "Command failed with exit code $exit_code";
+            print STDERR RED, timelog("whilejob"), RESET, "Command failed with exit code $exit_code\n";
             print STDERR $output if $output;
         } 
     };
     
     # Handle command execution errors
     if ($@) {
-        print STDERR timelog("whilejob"), "Error executing command: $@";
+        print STDERR timelog("whilejob"), "Error executing command: $@\n";
         last;
     }
 
     # print command's output
     if ($opt_debug_bool or $opt_verbose_bool) {
-        print STDERR   timelog("whilejob"), $output ? "$output" : "<No output from command>";
+        print STDERR  GREEN, timelog("whilejob"), RESET, "Output:\n";
     }
-    
+    print $output ? "$output" : "<No output from command>\n";
+
     # Check if job is still running
     if (scalar @current_ids == 0) {
-        print STDERR YELLOW, timelog("whilejob"), RESET, "Job $opt_jobid has finished";
+        print STDERR YELLOW, timelog("whilejob"), RESET, "Job $opt_jobid has finished\n";
         last;
     } else {
         if ($opt_verbose_bool) {
-            print STDERR timelog("whilejob"), "Job $opt_jobid is still running";
+            print STDERR YELLOW, timelog("whilejob"), RESET,  "Job $opt_jobid is still running\n";
         }
-        print STDERR timelog("whilejob"), "Waiting for $interval_seconds seconds" if $opt_debug_bool;
+        print STDERR timelog("whilejob"), "Waiting for $interval_seconds seconds\n" if $opt_debug_bool;
         sleep($interval_seconds);
     }
 }

@@ -7,7 +7,7 @@ use NBI::Job;
 use NBI::Opts;
 use base qw(Exporter);
 our @ISA = qw(Exporter);
-our @EXPORT = qw(Job Opts load_config has_queue timelog %FORMAT_STRINGS);
+our @EXPORT = qw(Job Opts load_config has_queue timelog execute_command %FORMAT_STRINGS);
 
 $NBI::Slurm::VERSION = '0.13.0';
 
@@ -32,6 +32,47 @@ our %FORMAT_STRINGS = (
  'user'       => '%u',
 );
 
+sub execute_command {
+    my ($command) = @_;
+    
+    # Use File::Temp functionality available in core Perl
+    use File::Temp qw(tempfile);
+    
+    # Create temporary files for capturing output
+    my ($stdout_fh, $stdout_file) = tempfile(UNLINK => 1);
+    my ($stderr_fh, $stderr_file) = tempfile(UNLINK => 1);
+    close($stdout_fh);  # Close handles so system() can write to files
+    close($stderr_fh);
+    
+    # Execute command with output redirection
+    my $full_command = "$command >$stdout_file 2>$stderr_file";
+    system($full_command);
+    
+    # Capture exit code (system() returns exit code << 8)
+    my $exit_code = $? >> 8;
+    
+    # Read stdout
+    my $stdout = '';
+    if (open(my $stdout_read_fh, '<', $stdout_file)) {
+        $stdout = do { local $/; <$stdout_read_fh> };
+        close($stdout_read_fh);
+    }
+    
+    # Read stderr  
+    my $stderr = '';
+    if (open(my $stderr_read_fh, '<', $stderr_file)) {
+        $stderr = do { local $/; <$stderr_read_fh> };
+        close($stderr_read_fh);
+    }
+    
+    # Files are automatically cleaned up due to UNLINK => 1
+    
+    return {
+        stdout    => $stdout,
+        stderr    => $stderr,
+        exit_code => $exit_code
+    };
+}
 
 sub load_config {
     my $filename = shift;
