@@ -1,18 +1,19 @@
 #!/usr/bin/env perl
 #PODNAME:printslurm
 #ABSTRACT:Utility to print info from Slurm
-use strict;
+use v5.12;
 use warnings;
 use Getopt::Long;
 use Term::ANSIColor;
-
+use NBI::Slurm;
 # Define command line options
 my $help = 0;
 my $node_info = 0;
 
 GetOptions(
     "help|h"   => \$help,
-    "node|n"   => \$node_info
+    "node|n"   => \$node_info,
+    "version"  => sub { say "printslurm v", $NBI::Slurm::VERSION; exit },
 ) or show_help();
 
 # Show help if requested
@@ -222,3 +223,31 @@ else {
 }
 
 exit(0);
+
+=head1 SYNOPSIS
+
+    printslurm [options]
+
+=head1 DESCRIPTION
+
+This script displays information about the Slurm environment, including queues (partitions) and Slurm environment variables. 
+When run with the C<--node> option, it displays detailed information about the current job allocation.
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<-n, --node>
+
+Display node-specific job information (when inside a Slurm job).
+
+=item B<--version>
+
+Show the version of the script.
+
+=item B<-h, --help>
+
+Show this help message and exit.
+
+=back
+

@@ -15,7 +15,7 @@ use Term::ANSIColor qw(:constants);
 my $config    = NBI::Slurm::load_config("$ENV{USER}/.nbislurm.config");
 my $package   = undef;
 my $force     = 0;
-my $dry_run   = 0;
+my $remove    = 0;  # New flag to actually perform removal
 my $packages_dir      = $config->{'packages_dir'} // '/nbi/software/testing/bin/';
 my $packages_basepath = $config->{'packages_basepath'} // '/nbi/software/testing/';
 my $opt_del_image = 0;
@@ -24,7 +24,7 @@ my $opt_help;
 # Parse command line options
 GetOptions(
     'f|force'     => \$force,
-    'd|dry'       => \$dry_run,
+    'r|remove'    => \$remove,  # New option to actually perform removal
     'i|delete-image' => \$opt_del_image,
     'help|h'      => \$opt_help,
 );
@@ -100,9 +100,35 @@ foreach my $file (@files_to_delete) {
 foreach my $image (@images) {
     say "$image";
 }
-# In dry run mode, just exit
-if ($dry_run) {
+
+# Check file ownership
+my $current_user = $ENV{USER};
+my $current_uid = getpwnam($current_user);
+my @unauthorized_files = ();
+
+foreach my $file (@files_to_delete) {
+    if (-e $file) {
+        my $file_uid = (stat($file))[4];
+        if ($file_uid != $current_uid) {
+            push @unauthorized_files, $file;
+        }
+    }
+}
+
+if (@unauthorized_files > 0) {
+    say STDERR RED, "ERROR:", RESET, " The following files/directories are not owned by $current_user:";
+    foreach my $file (@unauthorized_files) {
+        my $owner = getpwuid((stat($file))[4]) || "unknown";
+        say STDERR "  $file (owner: $owner)";
+    }
+    say STDERR RED, "ERROR:", RESET, " For security reasons, you can only delete files owned by your user.";
+    exit 1;
+}
+
+# In default mode (dry run), just exit unless --remove is specified
+if (!$remove) {
     say STDERR timelog("rm_package"), "Dry run completed. No files were deleted.";
+    say STDERR YELLOW, "INFO:", RESET, " Use --remove to actually delete these files.";
     exit 0;
 }
 
@@ -140,6 +166,15 @@ foreach my $file (@files_to_delete) {
 if ($opt_del_image)  {
     foreach my $image (@images) {
         if (-f $image) {
+            # Check image ownership
+            my $image_uid = (stat($image))[4];
+            if ($image_uid != $current_uid) {
+                my $owner = getpwuid($image_uid) || "unknown";
+                say STDERR RED, "ERROR:", RESET, " Cannot delete image $image: owned by $owner, not $current_user";
+                $success = 0;
+                next;
+            }
+            
             if (unlink $image) {
                 say STDERR "Deleted image: $image";
             } else {
@@ -159,7 +194,7 @@ if ($success) {
 
 sub usage {
     say STDERR <<END;
-rm_package PACKAGE_NAME [--force] [--dry]
+rm_package PACKAGE_NAME [--remove] [--force]
 
 Type --help for more information.
 END
@@ -201,6 +236,7 @@ sub getpaths {
     close($fh);
     return @paths;
 }
+
 sub check_environment {
     my ($packages_dir, $packages_basepath) = @_;
     my $errors = 0;
@@ -268,7 +304,7 @@ rm_package - Remove packages installed with make_package
 
 =head1 SYNOPSIS
 
-  rm_package PACKAGE_NAME [--force] [--dry]
+  rm_package PACKAGE_NAME [--remove] [--force]
 
 =head1 DESCRIPTION
 
@@ -276,8 +312,11 @@ This script safely removes packages that were previously installed using the mak
 script in the NBI HPC environment. It will remove both the binary file in the bin directory
 and the package directory tree.
 
-By default, the script lists the files that would be deleted and prompts for confirmation
-before proceeding with deletion.
+By default, the script runs in dry-run mode, which just lists the files that would be deleted
+without performing any deletion. Use the --remove option to actually delete the files.
+
+The script will check that all files to be deleted belong to the current user and will
+not delete files owned by other users, even with --force.
 
 =head1 OPTIONS
 
@@ -287,14 +326,18 @@ before proceeding with deletion.
 
 The name of the package to remove. Required.
 
-=item B<--dry>
+=item B<--remove>, B<-r>
 
-Dry run mode. Just print the list of files that would be deleted, without
-prompting or performing any deletion.
+Actually remove the files. Without this option, the script runs in dry-run mode.
 
-=item B<--force>
+=item B<--force>, B<-f>
 
-Force removal without prompting for confirmation.
+Skip the confirmation prompt when removing files. Still requires --remove to actually
+delete files, and will still check file ownership.
+
+=item B<--delete-image>, B<-i>
+
+Also delete any Singularity image files referenced in the package.
 
 =item B<--help>, B<-h>
 
@@ -304,17 +347,17 @@ Display this help message.
 
 =head1 EXAMPLES
 
-To remove a package named "seqfu" with confirmation prompt:
+To see what would be deleted without actually removing anything (dry-run mode):
 
   rm_package seqfu
 
-To see what would be deleted without actually removing anything:
+To remove a package named "seqfu" with confirmation prompt:
 
-  rm_package seqfu --dry
+  rm_package seqfu --remove
 
 To force removal without confirmation:
 
-  rm_package seqfu --force
+  rm_package seqfu --remove --force
 
 =head1 SEE ALSO
 

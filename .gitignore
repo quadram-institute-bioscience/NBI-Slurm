@@ -6,3 +6,4 @@ lib/Module
 catalogue.cache
 file.pl
 .vscode.smbdelete*
+.smbdelete*
