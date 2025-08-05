@@ -1,3 +1,7 @@
+0.14.0  2025-06-30
+
+* Added `--gpu` in runjob
+
 0.13.0  2025-05-20
 
 * Added `whilejob`

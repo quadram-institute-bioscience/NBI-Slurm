@@ -7,9 +7,9 @@ use NBI::Job;
 use NBI::Opts;
 use base qw(Exporter);
 our @ISA = qw(Exporter);
-our @EXPORT = qw(Job Opts load_config has_queue timelog execute_command %FORMAT_STRINGS);
+our @EXPORT = qw(Job Opts load_config has_squeue timelog execute_command %FORMAT_STRINGS);
 
-$NBI::Slurm::VERSION = '0.13.0';
+$NBI::Slurm::VERSION = '0.14.0';
 
 
 
@@ -287,7 +287,10 @@ Check if a queue is valid.
 
 Calculate the number of days since a file was last modified.
 
+=item * B<execute_command>
 
+Execute a system command and capture its stdout, stderr, and exit code.
+Returns a hash reference with keys: stdout, stderr, exit_code.
 
 =back 
 
