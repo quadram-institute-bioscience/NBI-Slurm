@@ -43,6 +43,7 @@ email_type=end,fail
 # Other custom defaults you can set:
 # queue=
 # time=
+# gpuqueue=
 
 # INTERACTIVE SESSION
 
