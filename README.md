@@ -26,6 +26,18 @@ Add `-d` to delete the jobs (you will be prompted for confirmation).
 
 ![lsjobs](docs/lsjobs.png)
 
+### viewjobs
+
+Interactive TUI (terminal user interface) for viewing and managing SLURM jobs with **viewjobs**, similar to VisiData or `less`.
+
+See [docs](https://metacpan.org/dist/NBI-Slurm/view/bin/viewjobs)
+
+```bash
+viewjobs
+```
+
+Features keyboard navigation (arrow keys or vim keys), column sorting with `[` and `]`, job selection with `Space`, column width adjustment with `+`/`-`, column hiding with `@`, and job deletion with `d` or `Ctrl-D`. Press `q` to quit, `r` to refresh.
+
 ### runjob
 
 Submit a job to the queue (with cores, memory, time, etc) with **runjob**. 

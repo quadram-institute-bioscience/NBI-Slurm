@@ -259,19 +259,19 @@ sub reason_string {
         $color = CYAN;
         return $color . $icon . ' ' . $s . RESET;
     } elsif ($s =~ /^Priority/i) {
-        $icon = '⏳';
+        $icon = '↑';    # was ⏳ — 2-wide emoji on modern terminals
         $color = YELLOW;
     } elsif ($s =~ /^Resources/i) {
-        $icon = '⚡';
+        $icon = '↯';    # was ⚡ — 2-wide emoji on modern terminals
         $color = YELLOW;
     } elsif ($s =~ /^Dependency/i) {
-        $icon = '⛓';
+        $icon = '→';    # was ⛓ — 2-wide emoji on modern terminals
         $color = BLUE;
     } elsif ($s =~ /^(Bad|Error|Invalid)/i) {
         $icon = '✗';
         $color = RED . BOLD;
     } elsif ($s =~ /^QOS/i) {
-        $icon = '⚠';
+        $icon = '!';    # was ⚠ — ambiguous-width on modern terminals
         $color = YELLOW;
     } else {
         $icon = '•';
@@ -408,13 +408,131 @@ sub hide_columns {
     return \@filtered_arrays;
 }
 
+sub ansi_first_char {
+    # Return the first visible glyph of an ANSI-coloured string,
+    # preserving any leading colour escape sequences.
+    my $s = shift;
+    my $prefix = '';
+    while ($s =~ s/^(\e\[[0-9;]*m)//) {
+        $prefix .= $1;
+    }
+    return $prefix . substr($s, 0, 1) . RESET;
+}
+
+sub fit_columns_to_terminal {
+    # Given natural column widths and the header row, return:
+    #   ($fitted_widths_ref, $hidden_hashref, $icon_only_hashref)
+    # Strategy (in order):
+    #   1. Shrink flexible cols (name, nodelist, reason) down to their minimums
+    #   2. Hide NodeList entirely  (optional column, first to go)
+    #   3. Hide Reason entirely    (optional column, second to go)
+    #   4. Collapse State to icon-only glyph
+    #   5. Last-resort: truncate whatever is still widest
+    my ($widths, $header) = @_;
+    my $terminal_width = get_terminal_width();
+
+    my @fitted    = @$widths;
+    my %hidden    = ();
+    my %icon_only = ();
+
+    # Map normalised column name -> index
+    my %col_idx;
+    for my $i (0..$#$header) {
+        my $name = lc($header->[$i]);
+        $name =~ s/[^a-z0-9]//g;
+        $col_idx{$name} = $i;
+    }
+
+    # Rendered width: left border + each visible col (content + 2 spaces + right border)
+    my $calc_width = sub {
+        my $w = 1;
+        for my $i (0..$#fitted) {
+            next if $hidden{$i};
+            $w += $fitted[$i] + 3;
+        }
+        return $w;
+    };
+
+    return (\@fitted, \%hidden, \%icon_only) if $calc_width->() <= $terminal_width;
+
+    # Step 1: Shrink Name/NodeList/Reason down to minimums
+    my %min_widths = (name => 10, nodelist => 8, reason => 8);
+    my $progress = 1;
+    while ($calc_width->() > $terminal_width && $progress) {
+        $progress = 0;
+        my ($best, $best_w) = (undef, 0);
+        for my $name (qw(name nodelist reason)) {
+            my $i = $col_idx{$name};
+            next unless defined $i;
+            next if $hidden{$i};
+            my $min = $min_widths{$name};
+            if ($fitted[$i] > $min && $fitted[$i] > $best_w) {
+                $best   = $name;
+                $best_w = $fitted[$i];
+            }
+        }
+        if (defined $best) {
+            my $i      = $col_idx{$best};
+            my $min    = $min_widths{$best};
+            my $excess = $calc_width->() - $terminal_width;
+            my $cut    = $fitted[$i] - $min;
+            $cut = $excess if $excess < $cut;
+            $fitted[$i] -= $cut;
+            $progress = 1 if $cut > 0;
+        }
+    }
+
+    # Step 2: Hide NodeList (optional, first to go)
+    if ($calc_width->() > $terminal_width) {
+        my $i = $col_idx{nodelist};
+        $hidden{$i} = 1 if defined $i;
+    }
+
+    # Step 3: Hide Reason (optional, second to go)
+    if ($calc_width->() > $terminal_width) {
+        my $i = $col_idx{reason};
+        $hidden{$i} = 1 if defined $i;
+    }
+
+    # Step 4: Collapse State to a single icon glyph
+    if ($calc_width->() > $terminal_width) {
+        my $i = $col_idx{state};
+        if (defined $i && !$hidden{$i}) {
+            $icon_only{$i} = 1;
+            $fitted[$i]    = 1;
+        }
+    }
+
+    # Step 5: Last-resort generic truncation of whatever is still widest
+    $progress = 1;
+    while ($calc_width->() > $terminal_width && $progress) {
+        $progress = 0;
+        my ($best_i, $best_w) = (-1, 0);
+        for my $i (0..$#fitted) {
+            next if $hidden{$i} || $icon_only{$i};
+            if ($fitted[$i] > 4 && $fitted[$i] > $best_w) {
+                $best_i = $i;
+                $best_w = $fitted[$i];
+            }
+        }
+        if ($best_i >= 0) {
+            my $excess = $calc_width->() - $terminal_width;
+            my $cut    = $fitted[$best_i] - 4;
+            $cut = $excess if $excess < $cut;
+            $fitted[$best_i] -= $cut;
+            $progress = 1 if $cut > 0;
+        }
+    }
+
+    return (\@fitted, \%hidden, \%icon_only);
+}
+
 sub render_table_modern {
     # Receive a list of lists (all same length) and print a modern table with Unicode borders
     my @rows = @_;
     return unless @rows;
 
     my $n_cols = scalar(@{$rows[0]});
-    my $line_width = get_terminal_width() - $n_cols - 1;
 
     # Calculate maximum widths for each column
     my @max_widths = ();
@@ -427,26 +545,31 @@ sub render_table_modern {
         push(@max_widths, $max_width);
     }
 
+    # Fit columns to terminal: truncate, hide optional cols, collapse State to icon
+    my ($fitted_widths, $hidden_cols, $icon_only_cols) =
+        fit_columns_to_terminal(\@max_widths, $rows[0]);
+
     # Print top border
-    print_border_line('top', \@max_widths);
+    print_border_line('top', $fitted_widths, $hidden_cols);
 
     # Print header row (first row)
     if (@rows > 0) {
-        print_table_row($rows[0], \@max_widths, 'header');
-        print_border_line('middle', \@max_widths);
+        print_table_row($rows[0], $fitted_widths, 'header', $hidden_cols, $icon_only_cols);
+        print_border_line('middle', $fitted_widths, $hidden_cols);
     }
 
     # Print data rows
     for my $i (1..$#rows) {
-        print_table_row($rows[$i], \@max_widths, 'data');
+        print_table_row($rows[$i], $fitted_widths, 'data', $hidden_cols, $icon_only_cols);
     }
 
     # Print bottom border
-    print_border_line('bottom', \@max_widths);
+    print_border_line('bottom', $fitted_widths, $hidden_cols);
 }
 
 sub print_border_line {
-    my ($type, $widths) = @_;
+    my ($type, $widths, $hidden) = @_;
+    $hidden //= {};
     my ($left, $mid, $right, $fill);
 
     if ($type eq 'top') {
@@ -457,42 +580,54 @@ sub print_border_line {
         ($left, $mid, $right, $fill) = ($BOX->{bl}, $BOX->{b}, $BOX->{br}, $BOX->{h});
     }
 
+    my @visible = grep { !$hidden->{$_} } 0..$#{$widths};
     print CYAN . $left . RESET;
-    for my $i (0..$#{$widths}) {
+    for my $j (0..$#visible) {
+        my $i = $visible[$j];
         print CYAN . ($fill x ($widths->[$i] + 2)) . RESET;
-        print CYAN . ($i == $#{$widths} ? $right : $mid) . RESET;
+        print CYAN . ($j == $#visible ? $right : $mid) . RESET;
     }
     say '';
 }
 
 sub print_table_row {
-    my ($row, $widths, $style) = @_;
+    my ($row, $widths, $style, $hidden, $icon_only) = @_;
+    $hidden    //= {};
+    $icon_only //= {};
 
     print CYAN . $BOX->{v} . RESET;
     for my $i (0..$#{$row}) {
-        my $cell = $row->[$i];
+        next if $hidden->{$i};
+
+        my $cell  = $row->[$i];
+        my $width = $widths->[$i];
+
+        # Icon-only mode: show just the leading glyph (used for State when space is tight)
+        if ($icon_only->{$i}) {
+            my $icon = ansi_first_char($cell);
+            print " $icon " . RESET;
+            print CYAN . $BOX->{v} . RESET;
+            next;
+        }
+
         my $stripped = $cell;
         $stripped =~ s/\e\[[0-9;]*m//g;  # Strip ANSI codes
 
-        my $cell_width = length($stripped);
-        my $padding = $widths->[$i] - $cell_width;
+        my $prefix = ($style eq 'header') ? BOLD . WHITE : '';
 
-        # Apply header styling
-        my $prefix = '';
-        if ($style eq 'header') {
-            $prefix = BOLD . WHITE;
+        if (length($stripped) > $width) {
+            # Truncate and mark with a coloured '>' ellipsis
+            my $visible = substr($stripped, 0, $width - 1);
+            print " $prefix$visible" . YELLOW . BOLD . '>' . RESET . ' ';
+        } else {
+            # Normal padded cell — preserve ANSI codes in the original value
+            my $tmpline = sprintf(" %s%-*s ", $prefix, $width, $stripped);
+            my $index = index($tmpline, $stripped);
+            if ($index >= 0) {
+                substr($tmpline, $index, length($stripped), $cell);
+            }
+            print $tmpline . RESET;
         }
-
-        # Build the cell content
-        my $tmpline = sprintf(" %s%-*s ", $prefix, $widths->[$i], $stripped);
-
-        # Replace stripped version with original (preserving ANSI codes)
-        my $index = index($tmpline, $stripped);
-        if ($index >= 0) {
-            substr($tmpline, $index, length($stripped), $cell);
-        }
-
-        print $tmpline . RESET;
         print CYAN . $BOX->{v} . RESET;
     }
     say '';

@@ -7,6 +7,7 @@ use warnings;
 use utf8;
 use FindBin qw($RealBin);
 use Data::Dumper;
+use Getopt::Long qw(:config no_ignore_case bundling);
 $Data::Dumper::Sortkeys = 1;
 
 if (-e "$RealBin/../dist.ini") {
@@ -15,6 +16,32 @@ if (-e "$RealBin/../dist.ini") {
 }
 
 use NBI::Slurm;
+
+# ── CLI arguments ─────────────────────────────────────────────────────────────
+# Parsed before the terminal check so --help works without a TTY.
+my $_default_user = $ENV{USER} // 'unknown';
+my %cli_opts = (
+    user    => $_default_user,
+    name    => '.+',
+    status  => '.+',
+    running => 0,
+    pending => 0,
+);
+
+GetOptions(
+    'u|user=s'   => \$cli_opts{user},
+    'n|name=s'   => \$cli_opts{name},
+    's|status=s' => \$cli_opts{status},
+    'r|running'  => \$cli_opts{running},
+    'p|pending'  => \$cli_opts{pending},
+    'h|help'     => sub { usage(); exit 0 },
+) or do { usage(); exit 1 };
+
+$cli_opts{user} = '.+' if lc($cli_opts{user}) eq 'all';
+
+# -r / -p override -s (last one wins if both given)
+$cli_opts{status} = '^RUNNING' if $cli_opts{running};
+$cli_opts{status} = '^PENDING' if $cli_opts{pending};
 
 # Check if STDIN is a terminal
 die "Error: Not running in a terminal\n" unless -t STDIN;
@@ -56,6 +83,18 @@ my $COLORS = {
     selected_active => "\e[0;1;37;46m",  # bold white on cyan (selected + active)
     status_bar => "\e[0;37;44m",         # white on blue
     reset => "\e[0;37;40m",              # back to normal
+    # Cell-specific semantic colors (applied only to unselected/inactive cells)
+    cell_running => "\e[0;32;40m",       # green on black  (State=RUNNING)
+    cell_pending => "\e[0;33;40m",       # yellow on black (State=PENDING)
+    cell_error   => "\e[0;31;40m",       # red on black    (error State/Reason)
+    cell_time_zero => "\e[0;34;40m",     # blue on black   (Time=0 / no time)
+    # Detail view
+    detail_key => "\e[0;36;40m",         # cyan on black   (key column in detail view)
+    # Filter input prompt
+    filter_prompt => "\e[0;30;43m",      # black on yellow (filter bar)
+    filter_active => "\e[0;1;33;40m",    # bold yellow on black (active-filter indicator)
+    # Column separator
+    col_sep => "\e[0;90;40m",            # dark-gray on black (between columns)
 };
 
 # Initialize state
@@ -95,6 +134,20 @@ my $state = {
     mode => 'normal',
     message => '',
     running => 1,
+
+    # CLI-supplied initial filters (re-applied on every refresh)
+    cli_opts => \%cli_opts,
+
+    # Filter state
+    all_jobs     => [],   # immutable master copy from last load
+    filters      => [],   # [{col_name, pattern, negate, label}, ...]
+    input_mode   => '',   # 'filter_include' | 'filter_negate' | ''
+    input_buffer => '',   # text typed so far in filter prompt
+
+    # Detail view state
+    detail_fields => [],
+    detail_scroll  => 0,
+    detail_jobid   => '',
 };
 
 # Package variable for terminal state restoration
@@ -195,6 +248,12 @@ sub read_key {
         return "ESC";
     }
 
+    # Enter / Return
+    return "ENTER" if ord($key) == 13 || ord($key) == 10;
+
+    # DEL / Backspace (0x7F)
+    return "DEL" if ord($key) == 127;
+
     # Handle Ctrl keys
     return "CTRL_C" if ord($key) == CTRL_C;
     return "CTRL_D" if ord($key) == CTRL_D;
@@ -223,12 +282,21 @@ sub load_jobs {
         push @jobs, $jobs_hash->{$jobid};
     }
 
-    $state->{jobs} = \@jobs;
+    # Store immutable master copy; working copy starts identical
+    $state->{all_jobs}      = \@jobs;
+    $state->{jobs}          = [@jobs];   # safety fallback if apply_filters skips
 
-    # Reset active_row if it's now out of bounds
-    if ($state->{active_row} >= scalar @jobs) {
-        $state->{active_row} = (scalar @jobs > 0) ? (scalar @jobs - 1) : 0;
-    }
+    # Clear interactive filters and selections on every (re)load
+    $state->{filters}       = [];
+    $state->{selected}      = {};
+    $state->{active_row}    = 0;
+    $state->{scroll_offset} = 0;
+
+    # Re-seed CLI-derived filters (persist across refreshes)
+    push_cli_filters($state);
+
+    # Apply them (also clamps active_row, re-sorts, adjusts scroll)
+    apply_filters($state);
 }
 
 sub getjobs {
@@ -282,9 +350,48 @@ sub stripchars {
     return $string;
 }
 
+# Translate CLI options into filter objects and push them onto the filter stack.
+# Called at the end of load_jobs so they re-apply after every refresh.
+sub push_cli_filters {
+    my $state = shift;
+    my $opts  = $state->{cli_opts} or return;
+
+    # User filter — treat the value as a full-match regex (like lsjobs does)
+    if ($opts->{user} ne '.+') {
+        push @{$state->{filters}}, {
+            col_name => 'User',
+            pattern  => '^(?:' . $opts->{user} . ')$',
+            negate   => 0,
+        };
+    }
+
+    # Name filter — partial regex, same as lsjobs
+    if ($opts->{name} ne '.+') {
+        push @{$state->{filters}}, {
+            col_name => 'Name',
+            pattern  => $opts->{name},
+            negate   => 0,
+        };
+    }
+
+    # Status filter — -r/-p already normalised into status by GetOptions block
+    if ($opts->{status} ne '.+') {
+        push @{$state->{filters}}, {
+            col_name => 'State',
+            pattern  => $opts->{status},
+            negate   => 0,
+        };
+    }
+}
+
 # Screen rendering
 sub render_screen {
     my $state = shift;
+
+    if ($state->{mode} eq 'detail') {
+        render_detail_screen($state);
+        return;
+    }
 
     print $ANSI->{hide_cursor};
     print $ANSI->{clear_screen};
@@ -302,9 +409,17 @@ sub render_header {
     my $line = '';
 
     my $col_pos = 0;
+    my $vis_idx = 0;
     for my $i (0..$#{$state->{columns}}) {
         my $col = $state->{columns}[$i];
         next unless $col->{visible};
+
+        # Column separator before every column except the first
+        if ($vis_idx > 0) {
+            last if $state->{term_width} - $col_pos <= 0;
+            $line .= $COLORS->{col_sep} . '|';
+            $col_pos += 1;
+        }
 
         my $avail = $state->{term_width} - $col_pos;
         last if $avail <= 0;
@@ -324,6 +439,7 @@ sub render_header {
 
         $line .= $color . sprintf("%-*s", $width, substr("$name $sort_icon", 0, $width));
         $col_pos += $width;
+        $vis_idx++;
     }
 
     # Fill rest of line with header color
@@ -360,9 +476,17 @@ sub render_job_row {
     my $line = '';
 
     my $col_pos = 0;
+    my $vis_idx = 0;
     for my $i (0..$#{$state->{columns}}) {
         my $col = $state->{columns}[$i];
         next unless $col->{visible};
+
+        # Column separator before every column except the first
+        if ($vis_idx > 0) {
+            last if $state->{term_width} - $col_pos <= 0;
+            $line .= $COLORS->{col_sep} . '|';
+            $col_pos += 1;
+        }
 
         my $avail = $state->{term_width} - $col_pos;
         last if $avail <= 0;
@@ -385,11 +509,12 @@ sub render_job_row {
         } elsif ($is_active_col) {
             $color = $COLORS->{active_col};
         } else {
-            $color = $COLORS->{normal};
+            $color = get_cell_color($col->{name}, $field) // $COLORS->{normal};
         }
 
         $line .= $color . sprintf("%-*s", $width, substr($field, 0, $width));
         $col_pos += $width;
+        $vis_idx++;
     }
 
     # Fill rest of line
@@ -406,20 +531,41 @@ sub render_job_row {
 
 sub render_footer {
     my $state = shift;
-    my $line = $COLORS->{status_bar};
 
+    # ── Filter input prompt (overrides everything else) ──────────────────
+    if ($state->{input_mode}) {
+        my $prefix   = $state->{input_mode} eq 'filter_negate' ? '!' : '/';
+        my $col_name = $state->{columns}[$state->{active_col}]{name};
+        my $prompt   = "  Filter [$col_name] $prefix" . $state->{input_buffer} . '▌';
+        print $COLORS->{filter_prompt}
+            . sprintf("%-*s", $state->{term_width}, substr($prompt, 0, $state->{term_width}))
+            . $COLORS->{reset};
+        return;
+    }
+
+    # ── Normal footer ─────────────────────────────────────────────────────
+    my $line = $COLORS->{status_bar};
     my $text;
+
     if ($state->{mode} eq 'confirm_delete') {
         my $num_selected = scalar keys %{$state->{selected}};
         $text = sprintf("Delete %d selected jobs? y/N ", $num_selected);
     } elsif ($state->{message}) {
         $text = $state->{message};
     } else {
-        # Show help text
-        $text = "q:quit ↑↓←→:nav Space:select [:sort ]:sort +:wider -:narrower \@:hide ^H:unhide ^D:delete r:refresh";
+        $text = "q:quit  Enter:details  /:filter  !:exclude  ↑↓←→:nav"
+              . "  Space:select  [:asc  ]:desc  +:wider  -:narrower"
+              . "  \@:hide  ^H:unhide  ^D:delete  r:refresh";
     }
-    $line .= sprintf("%-*s", $state->{term_width}, substr($text, 0, $state->{term_width}));
 
+    # Append active-filter count as a right-aligned badge when filters exist
+    if (@{$state->{filters}}) {
+        my $badge  = sprintf(" [%d filter(s) active] ", scalar @{$state->{filters}});
+        my $padded = substr($text, 0, $state->{term_width} - length($badge));
+        $text      = sprintf("%-*s", $state->{term_width} - length($badge), $padded) . $badge;
+    }
+
+    $line .= sprintf("%-*s", $state->{term_width}, substr($text, 0, $state->{term_width}));
     $line .= $COLORS->{reset};
     print $line;
 }
@@ -446,6 +592,334 @@ sub get_job_field {
     return $job->{$key} // 'N/A';
 }
 
+# Convert memory string (e.g. "2000M", "8G", "1T") to MB for sorting
+sub memory_to_mb {
+    my $mem = shift;
+    return 0 unless defined $mem && $mem ne 'N/A' && $mem ne '';
+    return $1 / 1024          if $mem =~ /^([\d.]+)[Kk]/;
+    return $1 + 0             if $mem =~ /^([\d.]+)[Mm]/;
+    return $1 * 1024          if $mem =~ /^([\d.]+)[Gg]/;
+    return $1 * 1024 * 1024   if $mem =~ /^([\d.]+)[Tt]/;
+    return $mem + 0;
+}
+
+# Convert SLURM time string ("M:SS", "H:MM:SS", "D-HH:MM:SS") to seconds for sorting
+sub time_to_seconds {
+    my $time = shift;
+    return 0 unless defined $time && $time ne 'N/A' && $time ne '' && $time ne '0:00';
+    my $total = 0;
+    my $t = $time;
+    $total += $1 * 86400 if $t =~ s/^(\d+)-//;   # strip days prefix
+    my @p = split(/:/, $t);
+    if    (@p == 3) { $total += $p[0]*3600 + $p[1]*60 + int($p[2]); }
+    elsif (@p == 2) { $total += $p[0]*60   + int($p[1]); }
+    elsif (@p == 1) { $total += int($p[0]); }
+    return $total;
+}
+
+# Return a sortable value for a column (handles Memory, Time, CPUs specially)
+sub get_sort_value {
+    my ($job, $col_name) = @_;
+    my $display = get_job_field($job, $col_name);
+    return memory_to_mb($display)    if $col_name eq 'Memory';
+    return time_to_seconds($display) if $col_name eq 'Time' || $col_name eq 'TotalTime';
+    return $display + 0              if $col_name eq 'CPUS';
+    return $display;
+}
+
+# Return a semantic cell color for a column value, or undef for the default
+sub get_cell_color {
+    my ($col_name, $value) = @_;
+    $value //= '';
+
+    if ($col_name eq 'State') {
+        return $COLORS->{cell_running} if $value =~ /^RUNNING/i;
+        return $COLORS->{cell_pending} if $value =~ /^PENDING/i;
+        return $COLORS->{cell_error}   if $value ne 'N/A' && $value ne '';
+    } elsif ($col_name eq 'Time') {
+        return $COLORS->{cell_time_zero}
+            if $value eq '' || $value eq '0:00' || $value eq 'N/A';
+    } elsif ($col_name eq 'Reason') {
+        # Highlight known error/limit reasons in red
+        return $COLORS->{cell_error}
+            if $value =~ /^(BadConstraints|PartitionTimeLimit|ReqNodeNotAvail
+                            |InvalidAccount|InvalidQOS|JobHoldAdmin
+                            |.*Limit$)/ix;
+    }
+    return undef;
+}
+
+# ── Job Detail View ────────────────────────────────────────────────────────────
+
+# Run scontrol show job <jobid> and parse into ordered [[key,val], ...] list.
+# Splits each output line on whitespace that precedes a KEY= token so that
+# values containing spaces (e.g. paths) are kept intact.
+sub fetch_job_details {
+    my $jobid = shift;
+    my @output = `scontrol show job $jobid 2>&1`;
+    my @fields;
+    for my $line (@output) {
+        chomp $line;
+        $line =~ s/^\s+//;
+        next if $line =~ /^\s*$/;
+        # split before "WORD=" boundaries (handles CPUS/Task, AllocNode:Sid …)
+        my @tokens = split /\s+(?=\w[\w:\/]*=)/, $line;
+        for my $token (@tokens) {
+            push @fields, [$1, $2] if $token =~ /^([^=]+)=(.*)/;
+        }
+    }
+    return \@fields;
+}
+
+sub show_job_details {
+    my $state = shift;
+    return if scalar @{$state->{jobs}} == 0;
+
+    my $job   = $state->{jobs}[$state->{active_row}];
+    my $jobid = $job->{JOBID};
+
+    # Show a brief loading flash on the normal screen
+    $state->{message} = "Loading details for job $jobid …";
+    render_screen($state);
+    $state->{message} = '';
+
+    my $fields = fetch_job_details($jobid);
+    if (!@$fields) {
+        $state->{message} = "No details returned for job $jobid";
+        return;
+    }
+
+    $state->{detail_fields} = $fields;
+    $state->{detail_scroll}  = 0;
+    $state->{detail_jobid}   = $jobid;
+    $state->{mode}           = 'detail';
+}
+
+# Semantic colour for a value in the detail view (returns a colour string)
+sub get_detail_value_color {
+    my ($key, $val) = @_;
+    $val //= '';
+
+    if ($key eq 'JobState') {
+        return $COLORS->{cell_running} if $val =~ /^RUNNING/i;
+        return $COLORS->{cell_pending} if $val =~ /^PENDING/i;
+        return $COLORS->{cell_error}
+            if $val =~ /^(FAILED|CANCELLED|TIMEOUT|NODE_FAIL|OUT_OF_MEMORY)/i;
+    } elsif ($key eq 'Reason') {
+        return $COLORS->{cell_error}
+            if $val =~ /^(BadConstraints|PartitionTimeLimit|ReqNodeNotAvail
+                          |InvalidAccount|InvalidQOS|JobHoldAdmin|.*Limit$)/ix;
+        return $COLORS->{cell_pending}
+            if $val =~ /^(Priority|Resources|Dependency|QOSMaxJobsPerUser)/i;
+    } elsif ($key eq 'ExitCode') {
+        # Non-zero exit code (e.g. "1:0" or "0:1") → red
+        return $COLORS->{cell_error} if $val =~ /^[1-9]/ || $val =~ /:[1-9]/;
+    }
+    return $COLORS->{normal};
+}
+
+sub render_detail_screen {
+    my $state = shift;
+    print $ANSI->{hide_cursor};
+    print $ANSI->{clear_screen};
+    print $ANSI->{move_home};
+    render_detail_header($state);
+    render_detail_body($state);
+    render_detail_footer($state);
+    print $ANSI->{show_cursor};
+}
+
+sub render_detail_header {
+    my $state = shift;
+    # Pull JobName from the parsed fields for the title bar
+    my $jobname = '';
+    for my $f (@{$state->{detail_fields}}) {
+        if ($f->[0] eq 'JobName') { $jobname = $f->[1]; last; }
+    }
+    my $title = "  Job Details  ·  #$state->{detail_jobid}"
+              . ($jobname ? "  ·  $jobname" : '');
+    print $COLORS->{header}
+        . sprintf("%-*s", $state->{term_width}, substr($title, 0, $state->{term_width}))
+        . $COLORS->{reset} . "\r\n";
+}
+
+sub render_detail_body {
+    my $state   = shift;
+    my $fields  = $state->{detail_fields};
+    my $visible = $state->{term_height} - 2;   # one header + one footer
+    my $KEY_W   = 22;
+    my $SEP     = ' │ ';
+    my $val_w   = $state->{term_width} - $KEY_W - length($SEP);
+    $val_w      = 10 if $val_w < 10;
+
+    for my $ri (0 .. $visible - 1) {
+        my $fi = $state->{detail_scroll} + $ri;
+
+        if ($fi >= scalar @$fields) {
+            # Empty padding row
+            print $COLORS->{normal}
+                . (' ' x $state->{term_width})
+                . $COLORS->{reset} . "\r\n";
+            next;
+        }
+
+        my ($key, $val) = @{$fields->[$fi]};
+        $val //= '';
+
+        my $val_color = get_detail_value_color($key, $val);
+
+        # Truncate long values; they can be scrolled horizontally in a future version
+        my $val_str = substr($val, 0, $val_w);
+
+        print $COLORS->{detail_key} . sprintf("%-*s", $KEY_W, substr($key, 0, $KEY_W))
+            . $COLORS->{normal}    . $SEP
+            . $val_color           . sprintf("%-*s", $val_w, $val_str)
+            . $COLORS->{reset}     . "\r\n";
+    }
+}
+
+sub render_detail_footer {
+    my $state  = shift;
+    my $total  = scalar @{$state->{detail_fields}};
+    my $vis    = $state->{term_height} - 2;
+    my $from   = $state->{detail_scroll} + 1;
+    my $to     = min($state->{detail_scroll} + $vis, $total);
+    my $text   = sprintf(
+        "  ESC/q:back  ↑↓/jk:scroll  PgUp/PgDn:page  g/G:top/bot   [%d-%d of %d fields]",
+        $from, $to, $total);
+    print $COLORS->{status_bar}
+        . sprintf("%-*s", $state->{term_width}, substr($text, 0, $state->{term_width}))
+        . $COLORS->{reset};
+}
+
+sub handle_detail_input {
+    my ($state, $key) = @_;
+    my $total = scalar @{$state->{detail_fields}};
+    my $vis   = $state->{term_height} - 2;
+
+    if ($key eq 'ESC' || $key eq 'q' || $key eq 'Q'
+            || $key eq 'CTRL_C' || $key eq 'ENTER') {
+        $state->{mode} = 'normal';
+    } elsif ($key eq 'UP' || $key eq 'k') {
+        $state->{detail_scroll}-- if $state->{detail_scroll} > 0;
+    } elsif ($key eq 'DOWN' || $key eq 'j') {
+        $state->{detail_scroll}++
+            if $state->{detail_scroll} < $total - $vis;
+    } elsif ($key eq 'PGUP') {
+        $state->{detail_scroll} = max(0, $state->{detail_scroll} - $vis);
+    } elsif ($key eq 'PGDN') {
+        $state->{detail_scroll} = max(0,
+            min($total - $vis, $state->{detail_scroll} + $vis));
+    } elsif ($key eq 'HOME' || $key eq 'g') {
+        $state->{detail_scroll} = 0;
+    } elsif ($key eq 'END' || $key eq 'G') {
+        $state->{detail_scroll} = max(0, $total - $vis);
+    }
+}
+
+# ── Column filters ────────────────────────────────────────────────────────────
+
+# Re-derive $state->{jobs} by applying every accumulated filter to all_jobs,
+# then re-apply the active sort (if any) and clean up stale selections.
+sub apply_filters {
+    my $state = shift;
+    return unless @{$state->{all_jobs}};
+
+    my @jobs = @{$state->{all_jobs}};
+
+    for my $f (@{$state->{filters}}) {
+        my ($col, $pat, $neg) = @{$f}{qw(col_name pattern negate)};
+        my @kept;
+        for my $job (@jobs) {
+            my $val     = get_job_field($job, $col);
+            my $matches = eval { $val =~ /$pat/i } // 0;
+            push @kept, $job if ($neg ? !$matches : $matches);
+        }
+        @jobs = @kept;
+    }
+
+    $state->{jobs} = \@jobs;
+
+    # Clamp active_row before sort so sort_column gets a valid job
+    if (!@jobs) {
+        $state->{active_row}    = 0;
+        $state->{scroll_offset} = 0;
+    } else {
+        my $max = $#jobs;
+        $state->{active_row} = $max if $state->{active_row} > $max;
+
+        # Re-apply whichever column is currently sorted
+        for my $col (@{$state->{columns}}) {
+            if ($col->{sort} ne 'none') {
+                sort_column($state, $col->{sort});
+                last;
+            }
+        }
+        adjust_scroll($state);
+    }
+
+    # Drop selections for jobs that are no longer visible
+    my %visible = map { $_->{JOBID} => 1 } @{$state->{jobs}};
+    delete $state->{selected}{$_}
+        for grep { !$visible{$_} } keys %{$state->{selected}};
+}
+
+# Validate the input buffer, push a new filter, and re-render.
+sub apply_filter {
+    my $state   = shift;
+    my $pattern = $state->{input_buffer};
+
+    unless (length $pattern) {
+        $state->{message} = "Filter cancelled (empty pattern)";
+        return;
+    }
+
+    # Validate regex before committing
+    my $ok = eval { "" =~ /$pattern/; 1 };
+    unless ($ok) {
+        (my $err = $@) =~ s/ at .+//s;
+        $state->{message} = "Invalid regex: $err";
+        return;
+    }
+
+    my $col_name = $state->{columns}[$state->{active_col}]{name};
+    my $negate   = ($state->{input_mode} eq 'filter_negate');
+
+    push @{$state->{filters}}, {
+        col_name => $col_name,
+        pattern  => $pattern,
+        negate   => $negate,
+    };
+
+    apply_filters($state);
+
+    my $prefix = $negate ? '!' : '/';
+    $state->{message} = sprintf(
+        "Filter %s%s on [%s]  →  %d job(s) shown  (r to reset all filters)",
+        $prefix, $pattern, $col_name, scalar @{$state->{jobs}});
+}
+
+# Handle keystrokes while the filter prompt is open.
+sub handle_filter_input {
+    my ($state, $key) = @_;
+
+    if ($key eq 'ESC' || $key eq 'CTRL_C') {
+        $state->{input_mode}   = '';
+        $state->{input_buffer} = '';
+        $state->{message}      = "Filter cancelled";
+    } elsif ($key eq 'ENTER') {
+        apply_filter($state);
+        $state->{input_mode}   = '';
+        $state->{input_buffer} = '';
+    } elsif ($key eq 'CTRL_H' || $key eq 'DEL') {
+        # Backspace
+        $state->{input_buffer} = substr($state->{input_buffer}, 0, -1)
+            if length($state->{input_buffer}) > 0;
+    } elsif (length($key) == 1 && ord($key) >= 32) {
+        $state->{input_buffer} .= $key;
+    }
+}
+
 # Input handling
 sub handle_input {
     my $state = shift;
@@ -458,6 +932,15 @@ sub handle_input {
 
     if ($state->{mode} eq 'confirm_delete') {
         return handle_delete_confirmation($state, $key);
+    }
+
+    if ($state->{mode} eq 'detail') {
+        return handle_detail_input($state, $key);
+    }
+
+    # Filter input mode (sub-mode of normal)
+    if ($state->{input_mode}) {
+        return handle_filter_input($state, $key);
     }
 
     # Navigation
@@ -501,6 +984,18 @@ sub handle_input {
         hide_active_column($state);
     } elsif ($key eq 'CTRL_H') {
         unhide_all_columns($state);
+    }
+    # Filter: / = keep matching rows, ! = keep non-matching rows
+    elsif ($key eq '/') {
+        $state->{input_mode}   = 'filter_include';
+        $state->{input_buffer} = '';
+    } elsif ($key eq '!') {
+        $state->{input_mode}   = 'filter_negate';
+        $state->{input_buffer} = '';
+    }
+    # Job details
+    elsif ($key eq 'ENTER') {
+        show_job_details($state);
     }
     # Delete
     elsif ($key eq 'CTRL_D' || $key eq 'd') {
@@ -680,11 +1175,11 @@ sub sort_column {
     # Sort jobs
     my $field_name = $col->{name};
     my @sorted = sort {
-        my $val_a = get_job_field($a, $field_name);
-        my $val_b = get_job_field($b, $field_name);
+        my $val_a = get_sort_value($a, $field_name);
+        my $val_b = get_sort_value($b, $field_name);
 
-        # Numeric sort if both are numbers
-        if ($val_a =~ /^\d+$/ && $val_b =~ /^\d+$/) {
+        # Numeric sort if both values look numeric (int or float)
+        if ($val_a =~ /^[\d.]+$/ && $val_b =~ /^[\d.]+$/) {
             return $direction eq 'asc' ? $val_a <=> $val_b : $val_b <=> $val_a;
         }
 
@@ -780,16 +1275,48 @@ sub delete_selected_jobs {
     }
 }
 
+sub usage {
+    binmode(STDOUT, ':utf8');
+    my $user = $ENV{USER} // 'unknown';
+    print <<"END";
+Usage: viewjobs [options]
+
+Interactive TUI for viewing and managing SLURM jobs.
+
+Options:
+  -u, --user <username>   Show only jobs from this user [default: $user]
+                          Use 'all' to show all users
+  -n, --name <pattern>    Show only jobs whose name matches this regex [default: .+]
+  -s, --status <pattern>  Show only jobs whose state matches this regex [default: .+]
+  -r, --running           Show only running jobs  (shorthand for -s '^RUNNING')
+  -p, --pending           Show only pending jobs  (shorthand for -s '^PENDING')
+  -h, --help              Show this help and exit
+
+Keyboard shortcuts (inside the TUI):
+  q / Ctrl+C    Quit
+  Enter         Open full job details (via scontrol)
+  /             Filter: keep rows where the active column matches a pattern
+  !             Filter: exclude rows where the active column matches a pattern
+  r             Refresh job list and reset all interactive filters
+  ↑↓ / j k     Move cursor up/down
+  ←→ / h l     Move cursor left/right (columns)
+  PgUp/PgDn     Scroll by page          g / G   Jump to top / bottom
+  Space         Toggle job selection
+  [ / ]         Sort active column ascending / descending
+  + / -         Widen / narrow active column
+  \@             Hide active column      Ctrl+H  Unhide all columns
+  d / Ctrl+D    Delete selected jobs (confirmation required)
+  Ctrl+L        Redraw screen
+
+END
+}
+
 # Run main
 main();
 
 __END__
 
 =pod
-
-=head1 NAME
-
-viewjobs - Interactive TUI for viewing and managing SLURM jobs
 
 =head1 SYNOPSIS
 

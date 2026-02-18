@@ -1,3 +1,13 @@
+0.16.1	2026-02-18
+
+* Minor fixes at `shelf`
+* Improved documentation
+
+0.16.0  2026-02-14
+
+* Added `viewjobs`, interactive viewer of jobs
+* Restyle of `lsjobs` output
+
 0.15.0	2025-06-30
 
 * `--gpu` now implies a dedicated queue

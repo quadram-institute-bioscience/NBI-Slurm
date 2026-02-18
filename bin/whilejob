@@ -228,6 +228,10 @@ Examples: "10s", "5m", "2h", "1d"
 
 Specify the username to check jobs for. By default, uses the current user.
 
+=item B<--stderr>
+
+Redirect stderr to stdout (default is to suppress stderr).
+
 =item B<--verbose>
 
 Display verbose output, including job status and command results.

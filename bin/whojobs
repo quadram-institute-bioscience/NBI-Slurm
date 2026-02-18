@@ -184,6 +184,10 @@ Only show users with at least the specified number of jobs.
 
 Display verbose output, including the total number of users with jobs, the total number of logged users, and the number of users printed.
 
+=item B<-s, --scramble>
+
+Scramble user names (privacy mode).
+
 =back
 
 =head1 ARGUMENTS

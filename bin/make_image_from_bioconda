@@ -25,7 +25,7 @@ GetOptions(
     'd|def=s'     => \$def_file,
     'dest=s'      => \$dest,
     'm|move'      => \$move,
-    'd|dry'       => \$dry,
+    'dry'         => \$dry,
     'v|verbose'   => \$verbose,
 );
 
@@ -292,6 +292,10 @@ See the C<--dest> option.
 The destination directory for the image file. 
 Default: /qib/platforms/Informatics/transfer/outgoing/singularity/core/,
 or C<default_dest> in the configuration.
+
+=item B<--dry>
+
+Dry run: print the build command but do not execute it.
 
 =item B<-v, --verbose>
 

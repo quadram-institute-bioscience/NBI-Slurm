@@ -298,10 +298,6 @@ sub getimage {
 }
 __END__
 
-=head1 NAME
-
-rm_package - Remove packages installed with make_package
-
 =head1 SYNOPSIS
 
   rm_package PACKAGE_NAME [--remove] [--force]

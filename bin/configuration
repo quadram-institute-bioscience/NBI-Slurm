@@ -110,7 +110,7 @@ The value can contain spaces and even equal signs, as long as the key doesn't.
 
 =item * C<tmpdir>
 
-Where to store temporary files for jobs. It's is recommended to customize this to store jobs and their logs 
+Where to store temporary files for jobs. It is recommended to customize this to store jobs and their logs 
 in a convenient location by default.
 
 =item * C<queue>

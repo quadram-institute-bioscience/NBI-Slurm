@@ -11,8 +11,11 @@ use Data::Dumper;
 use Term::ANSIColor qw(:constants);
 use FindBin qw($RealBin);
 use Storable;
-use lib "$RealBin";
+use lib "$RealBin/../lib";   # dev-mode path (same as lsjobs/viewjobs)
 use NBI::Slurm;
+
+binmode(STDOUT, ':utf8');
+binmode(STDERR, ':utf8');
 my $opt_help;
 my $opt_verbose; 
 my $opt_inst;
@@ -33,14 +36,26 @@ GetOptions(
   'version'      => sub { say "shelf v$version"; exit },
   'h|help'       => \$opt_help,
 );
-pod2usage({-exitval => 0, -verbose => 2}) if $opt_help;	
+pod2usage({-exitval => 0, -verbose => 2}) if $opt_help;
 my $search = $ARGV[0];
+unless ($search) {
+    die "Specify a search string for HPC packages.\n";
+}
+$search =~ s/^\s+|\s+$//g;   # trim whitespace
+
+# Validate $search is a usable regex to avoid "Invalid regexp" crashes later
+eval { '' =~ /$search/ };
+die "Invalid search pattern '$search': $@\n" if $@;
 
 my $cache_file = "$RealBin/catalogue.cache";
 my $cache = {};
-$cache = retrieve($cache_file) if (-e $cache_file and not $opt_refresh);
-unless ($search) {
- die "Specify a search string for HPC packages.\n";
+if (-e $cache_file and not $opt_refresh) {
+    eval { $cache = retrieve($cache_file) };
+    if ($@ || ref($cache) ne 'HASH') {
+        warn "Cache file corrupted, rebuilding\n";
+        $opt_refresh = 1;
+        $cache = {};
+    }
 }
 my @locations = (
 	'/qib/software/',
@@ -56,9 +71,11 @@ my @stages = (
 	'production',
 );
 
-my $cache_age = NBI::Slurm::days_since_update($cache_file);
-if ($cache_age > 14) {
-	say STDERR RED, "Cache file $cache_file is $cache_age days old. Consider refreshing it with --refresh", RESET;
+if (-e $cache_file) {
+    my $cache_age = NBI::Slurm::days_since_update($cache_file);
+    if ($cache_age > 14) {
+        say STDERR RED, "Cache file $cache_file is $cache_age days old. Consider refreshing it with --refresh", RESET;
+    }
 }
 
 if ($opt_refresh or not -e $cache_file) {
@@ -107,7 +124,7 @@ if ($opt_refresh or not -e $cache_file) {
 				if (not defined $data) {
 					next;
 				}
-					if ($data->{UUID} eq $search) {
+					if (($data->{UUID} // '') eq $search) {
 						#say  CYAN, "From $container/Singularity.manifest", RESET;
 						#print_details($data);
 						exit;
@@ -120,7 +137,8 @@ if ($opt_refresh or not -e $cache_file) {
 			}
 		}
 	}
-	store $cache, $cache_file;
+	eval { store $cache, $cache_file };
+	warn "Warning: could not save cache to $cache_file: $@\n" if $@;
 } else {
 	say STDERR BLUE, "Using cache file $cache_file", RESET if ($opt_verbose);
 }
@@ -156,12 +174,10 @@ for my $key (keys %$cache) {
 		# Print str with 30 chars max and then spaces, then \t and source package $pack
 		my $str2 = substr($str, 0, 30);
 		my $data = getJson($pack);
-		my $ver = '';
-		eval {
-		 $ver = $data->{ApplicationVersion} ? " " .  $data->{ApplicationVersion} : "";
-		};
-        $str2.=$ver;
-		my $spaces = ' ' x (30 - length($str2));
+		my $ver = (defined $data && defined $data->{ApplicationVersion})
+		        ? ' ' . $data->{ApplicationVersion} : '';
+		$str2 .= $ver;
+		my $spaces = ' ' x (30 - length($str2) > 0 ? 30 - length($str2) : 0);
 		if ($str2 =~/__/) {
 			$str2 = substr($str2, 0, index($str2, '__'));
 			$str2 .= ' ' . MAGENTA;
@@ -217,14 +233,9 @@ sub getinfo {
     };
     
     if ($@) {
-		if (not $opt_refresh) {
-			my $json_file_beginning = substr($json, 0, 100);
-    	    die "*** Error decoding JSON in '$json_file':\n$json_file_beginning\n\nERROR: $@\n";
-		} else {
-			# We will ignore the error if we are refreshing the cache
-			return undef;
-		}
-		
+        # Not a JSON manifest (e.g. a Singularity .def file) — skip silently
+        say STDERR YELLOW, "Skipping non-JSON manifest: $json_file", RESET if $opt_verbose;
+        return undef;
     }
 
     return $decoded_json;
@@ -232,12 +243,12 @@ sub getinfo {
 sub getJson {
 	my $uuid = $_[0];
 	for my $l (@locations) {
-		
 		if (-e "${l}/containers/$uuid/Singularity.manifest") {
 			my $data = getinfo("${l}/containers/$uuid/Singularity.manifest");
 			return $data;
-		} 
-	}	
+		}
+	}
+	return undef;
 }
 __END__
 
@@ -259,9 +270,13 @@ Will use a cache file to speed up the search.
 
 Only display software in the legacy catalogue.
 
-=item B<-n>, B<--new-only>
+=item B<-n>, B<--new-catalogue>
 
 Only display software in the new catalogue (containers).
+
+=item B<-x>, B<--extended-search>
+
+Search also in the description of the packages (only for the new catalogue).
 
 =item B<--refresh>
 

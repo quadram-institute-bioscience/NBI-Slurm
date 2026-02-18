@@ -167,10 +167,6 @@ sub get_package_name {
 
 __END__
 
-=head1 NAME
-
-make_package - Create package for installing Singularity containers as HPC packages
-
 =head1 SYNOPSIS
 
   make_package -i SINGULARITY_IMAGE [-p PACKAGE] COMMANDS...
