@@ -1,0 +1,909 @@
+#!/usr/bin/env perl
+#ABSTRACT: Interactive TUI for viewing and managing SLURM jobs
+#PODNAME: viewjobs
+
+use v5.12;
+use warnings;
+use utf8;
+use FindBin qw($RealBin);
+use Data::Dumper;
+$Data::Dumper::Sortkeys = 1;
+
+if (-e "$RealBin/../dist.ini") {
+    say STDERR "[dev mode] Using local lib" if ($ENV{"DEBUG"});
+    use lib "$RealBin/../lib";
+}
+
+use NBI::Slurm;
+
+# Check if STDIN is a terminal
+die "Error: Not running in a terminal\n" unless -t STDIN;
+
+# Check SLURM availability
+if (not NBI::Slurm::has_squeue()) {
+    die "Error: squeue not found. Are you in the cluster?\n";
+}
+
+# Constants for Ctrl keys
+use constant {
+    CTRL_C => 3,
+    CTRL_D => 4,
+    CTRL_H => 8,
+    CTRL_L => 12,
+    CTRL_R => 18,
+};
+
+# ANSI escape sequences
+my $ANSI = {
+    clear_screen => "\e[2J",
+    move_home => "\e[H",
+    move_to => sub { my ($row, $col) = @_; "\e[${row};${col}H" },
+    hide_cursor => "\e[?25l",
+    show_cursor => "\e[?25h",
+    clear_line => "\e[2K",
+    save_cursor => "\e7",
+    restore_cursor => "\e8",
+};
+
+# Color scheme (always with bg and fg)
+my $COLORS = {
+    normal => "\e[0;37;40m",             # white on black
+    active_col => "\e[0;1;37;40m",       # bold white on black
+    header => "\e[0;1;37;44m",           # bold white on blue
+    active_row => "\e[0;30;47m",         # black on white
+    active_cell => "\e[0;1;30;43m",      # bold black on yellow
+    selected => "\e[0;37;45m",           # white on magenta
+    selected_active => "\e[0;1;37;46m",  # bold white on cyan (selected + active)
+    status_bar => "\e[0;37;44m",         # white on blue
+    reset => "\e[0;37;40m",              # back to normal
+};
+
+# Initialize state
+my $state = {
+    # Job data
+    jobs => [],
+    columns => [
+        {name => 'JobID', width => 10, visible => 1, sort => 'none'},
+        {name => 'User', width => 12, visible => 1, sort => 'none'},
+        {name => 'Queue', width => 12, visible => 1, sort => 'none'},
+        {name => 'Name', width => 20, visible => 1, sort => 'none'},
+        {name => 'State', width => 10, visible => 1, sort => 'none'},
+        {name => 'Time', width => 10, visible => 1, sort => 'none'},
+        {name => 'TotalTime', width => 10, visible => 1, sort => 'none'},
+        {name => 'NodeList', width => 15, visible => 1, sort => 'none'},
+        {name => 'CPUS', width => 6, visible => 1, sort => 'none'},
+        {name => 'Memory', width => 8, visible => 1, sort => 'none'},
+        {name => 'Reason', width => 15, visible => 1, sort => 'none'},
+    ],
+
+    # Navigation
+    active_row => 0,
+    active_col => 0,
+    scroll_offset => 0,
+    scroll_col_offset => 0,
+
+    # Selection
+    selected => {},
+
+    # Display
+    term_height => 24,
+    term_width => 80,
+    header_rows => 1,
+    footer_rows => 1,
+
+    # UI state
+    mode => 'normal',
+    message => '',
+    running => 1,
+};
+
+# Package variable for terminal state restoration
+our $original_stty;
+
+# Main entry point
+sub main {
+    # Initialize terminal size
+    ($state->{term_height}, $state->{term_width}) = get_terminal_size();
+
+    # Load initial job data
+    load_jobs($state);
+
+    # Setup terminal
+    $original_stty = `stty -g 2>/dev/null`;
+    chomp $original_stty;
+    system('stty raw -echo') == 0 or die "Failed to set raw mode\n";
+
+    # Enable output autoflush
+    $| = 1;
+    binmode(STDOUT, ':utf8');
+    binmode(STDERR, ':utf8');
+
+    # Comprehensive signal handling
+    $SIG{INT} = sub { cleanup(); exit 0 };
+    $SIG{TERM} = sub { cleanup(); exit 0 };
+    $SIG{QUIT} = sub { cleanup(); exit 0 };
+    $SIG{TSTP} = sub { cleanup(); exit 0 };
+    $SIG{WINCH} = 'IGNORE';
+
+    END { cleanup() if $original_stty }
+
+    # Main loop
+    while ($state->{running}) {
+        render_screen($state);
+        handle_input($state);
+    }
+
+    cleanup();
+}
+
+# Terminal control functions
+sub get_terminal_size {
+    my $height = `tput lines 2>/dev/null`;
+    my $width = `tput cols 2>/dev/null`;
+
+    chomp($height) if defined $height;
+    chomp($width) if defined $width;
+
+    $height = 24 unless ($height && $height =~ /^\d+$/ && $height > 10);
+    $width = 80 unless ($width && $width =~ /^\d+$/ && $width > 40);
+
+    return ($height, $width);
+}
+
+sub cleanup {
+    print $ANSI->{clear_screen};
+    print $ANSI->{move_home};
+    print $ANSI->{show_cursor};
+    print $COLORS->{reset};
+    system("stty $original_stty") if $original_stty;
+}
+
+# Keyboard input
+sub read_key {
+    my $key;
+    sysread(STDIN, $key, 1) or return '';
+
+    # Handle escape sequences with timeout
+    if ($key eq "\e") {
+        my $seq = '';
+
+        # Use select() with 100ms timeout to detect escape sequences
+        my $rin = '';
+        vec($rin, fileno(STDIN), 1) = 1;
+        my $nfound = select(my $rout = $rin, undef, undef, 0.1);
+
+        if ($nfound) {
+            # Read up to 10 bytes for multi-byte sequences
+            sysread(STDIN, $seq, 10);
+
+            # Standard arrow keys
+            return "UP" if $seq =~ /^\[A/;
+            return "DOWN" if $seq =~ /^\[B/;
+            return "RIGHT" if $seq =~ /^\[C/;
+            return "LEFT" if $seq =~ /^\[D/;
+
+            # Page Up/Down
+            return "PGUP" if $seq =~ /^\[5~/;
+            return "PGDN" if $seq =~ /^\[6~/;
+
+            # Home/End (multiple variants)
+            return "HOME" if $seq =~ /^\[(H|1~)/;
+            return "END" if $seq =~ /^\[(F|4~)/;
+        }
+
+        # Just ESC alone
+        return "ESC";
+    }
+
+    # Handle Ctrl keys
+    return "CTRL_C" if ord($key) == CTRL_C;
+    return "CTRL_D" if ord($key) == CTRL_D;
+    return "CTRL_H" if ord($key) == CTRL_H;
+    return "CTRL_L" if ord($key) == CTRL_L;
+    return "CTRL_R" if ord($key) == CTRL_R;
+
+    return $key;
+}
+
+# Data loading
+sub load_jobs {
+    my $state = shift;
+
+    # Reuse getjobs() from lsjobs with error handling
+    my $jobs_hash = eval { getjobs() };
+    if ($@ || !defined $jobs_hash || ref($jobs_hash) ne 'HASH') {
+        $state->{message} = "Error loading jobs: $@";
+        $state->{jobs} = [];
+        return;
+    }
+
+    # Convert to array for easier indexing
+    my @jobs = ();
+    for my $jobid (sort keys %$jobs_hash) {
+        push @jobs, $jobs_hash->{$jobid};
+    }
+
+    $state->{jobs} = \@jobs;
+
+    # Reset active_row if it's now out of bounds
+    if ($state->{active_row} >= scalar @jobs) {
+        $state->{active_row} = (scalar @jobs > 0) ? (scalar @jobs - 1) : 0;
+    }
+}
+
+sub getjobs {
+    # Create an anonymous hash, and return it
+    my $jobs = {};
+    # Use specific format for efficiency - only get fields we need
+    my $cmd = q(squeue --format='%i|%u|%P|%j|%T|%M|%l|%N|%C|%m|%r');
+    my @output = `$cmd 2>&1`;
+
+    # Check if command failed
+    if ($? != 0) {
+        die "Failed to execute squeue command\n";
+    }
+
+    my $c = 0;
+    my @header = ();
+    for my $line (@output) {
+        chomp $line;
+        next if $line =~ /^\s*$/;
+
+        my @fields = split(/\|/, $line);
+        $c++;
+        if ($c == 1) {
+            # Field names
+            for my $field (@fields) {
+                push(@header, stripchars($field));
+            }
+        } else {
+            # Job info
+            my $job = {};
+            if (scalar(@fields) != scalar(@header)) {
+                next;  # Skip malformed lines
+            }
+            for my $i (0..$#header) {
+                $job->{"$header[$i]"} = $fields[$i] if (not defined $job->{"$header[$i]"});
+            }
+
+            # Ensure we have a valid JOBID before adding
+            if (defined $job->{JOBID} && $job->{JOBID} ne '') {
+                $jobs->{$job->{JOBID}} = $job;
+            }
+        }
+    }
+
+    return $jobs;
+}
+
+sub stripchars {
+    my $string = shift;
+    $string =~ s/[^A-Za-z0-9]/_/g;
+    return $string;
+}
+
+# Screen rendering
+sub render_screen {
+    my $state = shift;
+
+    print $ANSI->{hide_cursor};
+    print $ANSI->{clear_screen};
+    print $ANSI->{move_home};
+
+    render_header($state);
+    render_data_rows($state);
+    render_footer($state);
+
+    print $ANSI->{show_cursor};
+}
+
+sub render_header {
+    my $state = shift;
+    my $line = '';
+
+    my $col_pos = 0;
+    for my $i (0..$#{$state->{columns}}) {
+        my $col = $state->{columns}[$i];
+        next unless $col->{visible};
+
+        my $avail = $state->{term_width} - $col_pos;
+        last if $avail <= 0;
+
+        my $width = $col->{width};
+        $width = $avail if $width > $avail;
+        my $name = $col->{name};
+
+        # Highlight active column
+        my $color = ($i == $state->{active_col})
+            ? $COLORS->{active_cell}
+            : $COLORS->{header};
+
+        # Add sort indicator
+        my $sort_icon = $col->{sort} eq 'asc' ? '↑' :
+                       $col->{sort} eq 'desc' ? '↓' : ' ';
+
+        $line .= $color . sprintf("%-*s", $width, substr("$name $sort_icon", 0, $width));
+        $col_pos += $width;
+    }
+
+    # Fill rest of line with header color
+    my $remaining = $state->{term_width} - $col_pos;
+    $line .= $COLORS->{header} . (' ' x $remaining) if $remaining > 0;
+    $line .= $COLORS->{reset};
+
+    print $line . "\r\n";
+}
+
+sub render_data_rows {
+    my $state = shift;
+    my $visible_rows = $state->{term_height} - $state->{header_rows} - $state->{footer_rows};
+
+    for my $row_idx (0..$visible_rows-1) {
+        my $job_idx = $state->{scroll_offset} + $row_idx;
+
+        if ($job_idx >= scalar @{$state->{jobs}}) {
+            # Empty row - fill with normal colors
+            print $COLORS->{normal} . (' ' x $state->{term_width}) . $COLORS->{reset} . "\r\n";
+            next;
+        }
+
+        my $job = $state->{jobs}[$job_idx];
+        my $is_active_row = ($job_idx == $state->{active_row});
+        my $is_selected = exists $state->{selected}{$job->{JOBID}};
+
+        render_job_row($state, $job, $is_active_row, $is_selected);
+    }
+}
+
+sub render_job_row {
+    my ($state, $job, $is_active_row, $is_selected) = @_;
+    my $line = '';
+
+    my $col_pos = 0;
+    for my $i (0..$#{$state->{columns}}) {
+        my $col = $state->{columns}[$i];
+        next unless $col->{visible};
+
+        my $avail = $state->{term_width} - $col_pos;
+        last if $avail <= 0;
+
+        my $width = $col->{width};
+        $width = $avail if $width > $avail;
+        my $field = get_job_field($job, $col->{name});
+
+        # Determine cell color (handle overlapping states)
+        my $color;
+        my $is_active_col = ($i == $state->{active_col});
+        if ($is_active_row && $is_selected && $is_active_col) {
+            $color = $COLORS->{selected_active};
+        } elsif ($is_active_row && $is_active_col) {
+            $color = $COLORS->{active_cell};
+        } elsif ($is_active_row) {
+            $color = $COLORS->{active_row};
+        } elsif ($is_selected) {
+            $color = $COLORS->{selected};
+        } elsif ($is_active_col) {
+            $color = $COLORS->{active_col};
+        } else {
+            $color = $COLORS->{normal};
+        }
+
+        $line .= $color . sprintf("%-*s", $width, substr($field, 0, $width));
+        $col_pos += $width;
+    }
+
+    # Fill rest of line
+    my $remaining = $state->{term_width} - $col_pos;
+    if ($remaining > 0) {
+        my $fill_color = $is_active_row ? $COLORS->{active_row} :
+                        $is_selected ? $COLORS->{selected} :
+                        $COLORS->{normal};
+        $line .= $fill_color . (' ' x $remaining);
+    }
+
+    print $line . $COLORS->{reset} . "\r\n";
+}
+
+sub render_footer {
+    my $state = shift;
+    my $line = $COLORS->{status_bar};
+
+    my $text;
+    if ($state->{mode} eq 'confirm_delete') {
+        my $num_selected = scalar keys %{$state->{selected}};
+        $text = sprintf("Delete %d selected jobs? y/N ", $num_selected);
+    } elsif ($state->{message}) {
+        $text = $state->{message};
+    } else {
+        # Show help text
+        $text = "q:quit ↑↓←→:nav Space:select [:sort ]:sort +:wider -:narrower \@:hide ^H:unhide ^D:delete r:refresh";
+    }
+    $line .= sprintf("%-*s", $state->{term_width}, substr($text, 0, $state->{term_width}));
+
+    $line .= $COLORS->{reset};
+    print $line;
+}
+
+# Field mapping
+sub get_job_field {
+    my ($job, $field_name) = @_;
+
+    my %field_map = (
+        'JobID' => 'JOBID',
+        'User' => 'USER',
+        'Queue' => 'PARTITION',
+        'Name' => 'NAME',
+        'State' => 'STATE',
+        'Time' => 'TIME',
+        'TotalTime' => 'TIME_LIMIT',
+        'NodeList' => 'NODELIST',
+        'CPUS' => 'CPUS',
+        'Memory' => 'MIN_MEMORY',
+        'Reason' => 'REASON',
+    );
+
+    my $key = $field_map{$field_name} // $field_name;
+    return $job->{$key} // 'N/A';
+}
+
+# Input handling
+sub handle_input {
+    my $state = shift;
+    my $key = read_key();
+
+    # Clear message after any key press (except in confirm mode)
+    if ($state->{mode} ne 'confirm_delete') {
+        $state->{message} = '';
+    }
+
+    if ($state->{mode} eq 'confirm_delete') {
+        return handle_delete_confirmation($state, $key);
+    }
+
+    # Navigation
+    if ($key eq 'UP' || $key eq 'k') {
+        move_cursor_up($state);
+    } elsif ($key eq 'DOWN' || $key eq 'j') {
+        move_cursor_down($state);
+    } elsif ($key eq 'LEFT' || $key eq 'h') {
+        move_cursor_left($state);
+    } elsif ($key eq 'RIGHT' || $key eq 'l') {
+        move_cursor_right($state);
+    }
+    # Page navigation
+    elsif ($key eq 'PGUP') {
+        move_page_up($state);
+    } elsif ($key eq 'PGDN') {
+        move_page_down($state);
+    } elsif ($key eq 'HOME' || $key eq 'g') {
+        move_to_top($state);
+    } elsif ($key eq 'END' || $key eq 'G') {
+        move_to_bottom($state);
+    }
+    # Selection
+    elsif ($key eq ' ') {
+        toggle_selection($state);
+    }
+    # Sorting
+    elsif ($key eq '[') {
+        sort_column($state, 'asc');
+    } elsif ($key eq ']') {
+        sort_column($state, 'desc');
+    }
+    # Column width
+    elsif ($key eq '+' || $key eq '=') {
+        adjust_column_width($state, +2);
+    } elsif ($key eq '-' || $key eq '_') {
+        adjust_column_width($state, -2);
+    }
+    # Column visibility
+    elsif ($key eq '@') {
+        hide_active_column($state);
+    } elsif ($key eq 'CTRL_H') {
+        unhide_all_columns($state);
+    }
+    # Delete
+    elsif ($key eq 'CTRL_D' || $key eq 'd') {
+        if (scalar keys %{$state->{selected}} > 0) {
+            $state->{mode} = 'confirm_delete';
+        } else {
+            $state->{message} = "No jobs selected (use Space to select)";
+        }
+    }
+    # Quit
+    elsif ($key eq 'q' || $key eq 'Q' || $key eq 'CTRL_C') {
+        $state->{running} = 0;
+    }
+    # Refresh/Redraw
+    elsif ($key eq 'r' || $key eq 'R' || $key eq 'CTRL_R') {
+        $state->{message} = "Refreshing...";
+        render_screen($state);
+        load_jobs($state);
+    } elsif ($key eq 'CTRL_L') {
+        # Just redraw screen (no data reload)
+    }
+}
+
+# Navigation functions
+sub move_cursor_up {
+    my $state = shift;
+    return if scalar @{$state->{jobs}} == 0;
+
+    if ($state->{active_row} > 0) {
+        $state->{active_row}--;
+        adjust_scroll($state);
+    }
+}
+
+sub move_cursor_down {
+    my $state = shift;
+    return if scalar @{$state->{jobs}} == 0;
+
+    my $max_row = scalar(@{$state->{jobs}}) - 1;
+    if ($state->{active_row} < $max_row) {
+        $state->{active_row}++;
+        adjust_scroll($state);
+    }
+}
+
+sub move_cursor_left {
+    my $state = shift;
+
+    # Find previous visible column
+    my $start_col = $state->{active_col};
+    my $col = $start_col;
+
+    do {
+        $col--;
+        if ($col < 0) {
+            $col = $#{$state->{columns}};
+        }
+
+        if ($state->{columns}[$col]{visible}) {
+            $state->{active_col} = $col;
+            return;
+        }
+    } while ($col != $start_col);
+}
+
+sub move_cursor_right {
+    my $state = shift;
+
+    # Find next visible column
+    my $start_col = $state->{active_col};
+    my $col = $start_col;
+
+    do {
+        $col++;
+        if ($col > $#{$state->{columns}}) {
+            $col = 0;
+        }
+
+        if ($state->{columns}[$col]{visible}) {
+            $state->{active_col} = $col;
+            return;
+        }
+    } while ($col != $start_col);
+}
+
+sub move_page_up {
+    my $state = shift;
+    return if scalar @{$state->{jobs}} == 0;
+
+    my $visible_rows = $state->{term_height} - $state->{header_rows} - $state->{footer_rows};
+    $state->{active_row} = max(0, $state->{active_row} - $visible_rows);
+    adjust_scroll($state);
+}
+
+sub move_page_down {
+    my $state = shift;
+    return if scalar @{$state->{jobs}} == 0;
+
+    my $visible_rows = $state->{term_height} - $state->{header_rows} - $state->{footer_rows};
+    my $max_row = scalar(@{$state->{jobs}}) - 1;
+    $state->{active_row} = min($max_row, $state->{active_row} + $visible_rows);
+    adjust_scroll($state);
+}
+
+sub move_to_top {
+    my $state = shift;
+    return if scalar @{$state->{jobs}} == 0;
+
+    $state->{active_row} = 0;
+    adjust_scroll($state);
+}
+
+sub move_to_bottom {
+    my $state = shift;
+    return if scalar @{$state->{jobs}} == 0;
+
+    $state->{active_row} = scalar(@{$state->{jobs}}) - 1;
+    adjust_scroll($state);
+}
+
+sub adjust_scroll {
+    my $state = shift;
+    my $visible_rows = $state->{term_height} - $state->{header_rows} - $state->{footer_rows};
+
+    # Scroll down if cursor below visible area
+    if ($state->{active_row} >= $state->{scroll_offset} + $visible_rows) {
+        $state->{scroll_offset} = $state->{active_row} - $visible_rows + 1;
+    }
+
+    # Scroll up if cursor above visible area
+    if ($state->{active_row} < $state->{scroll_offset}) {
+        $state->{scroll_offset} = $state->{active_row};
+    }
+}
+
+# Helper functions
+sub min { $_[0] < $_[1] ? $_[0] : $_[1] }
+sub max { $_[0] > $_[1] ? $_[0] : $_[1] }
+
+# Selection and interaction
+sub toggle_selection {
+    my $state = shift;
+    return if scalar @{$state->{jobs}} == 0;
+
+    my $job = $state->{jobs}[$state->{active_row}];
+    return unless $job;
+
+    my $jobid = $job->{JOBID};
+
+    if (exists $state->{selected}{$jobid}) {
+        delete $state->{selected}{$jobid};
+        $state->{message} = "Deselected job $jobid";
+    } else {
+        $state->{selected}{$jobid} = 1;
+        $state->{message} = "Selected job $jobid";
+    }
+}
+
+sub sort_column {
+    my ($state, $direction) = @_;
+    return if scalar @{$state->{jobs}} == 0;
+
+    my $col_idx = $state->{active_col};
+    my $col = $state->{columns}[$col_idx];
+
+    # Remember the currently active job ID
+    my $active_jobid = $state->{jobs}[$state->{active_row}]{JOBID};
+
+    # Update sort state
+    $col->{sort} = $direction;
+
+    # Clear other column sorts
+    for my $c (@{$state->{columns}}) {
+        $c->{sort} = 'none' unless $c == $col;
+    }
+
+    # Sort jobs
+    my $field_name = $col->{name};
+    my @sorted = sort {
+        my $val_a = get_job_field($a, $field_name);
+        my $val_b = get_job_field($b, $field_name);
+
+        # Numeric sort if both are numbers
+        if ($val_a =~ /^\d+$/ && $val_b =~ /^\d+$/) {
+            return $direction eq 'asc' ? $val_a <=> $val_b : $val_b <=> $val_a;
+        }
+
+        # String sort
+        return $direction eq 'asc' ? $val_a cmp $val_b : $val_b cmp $val_a;
+    } @{$state->{jobs}};
+
+    $state->{jobs} = \@sorted;
+
+    # Find the active job in new position
+    for my $i (0..$#{$state->{jobs}}) {
+        if ($state->{jobs}[$i]{JOBID} eq $active_jobid) {
+            $state->{active_row} = $i;
+            adjust_scroll($state);
+            last;
+        }
+    }
+
+    $state->{message} = "Sorted by " . $col->{name} . " (" . $direction . ")";
+}
+
+sub adjust_column_width {
+    my ($state, $delta) = @_;
+    my $col = $state->{columns}[$state->{active_col}];
+    my $old_width = $col->{width};
+    $col->{width} = max(3, $col->{width} + $delta);
+
+    if ($old_width != $col->{width}) {
+        $state->{message} = $col->{name} . " width: " . $col->{width};
+    }
+}
+
+sub hide_active_column {
+    my $state = shift;
+    my $col = $state->{columns}[$state->{active_col}];
+
+    # Count visible columns
+    my $visible_count = 0;
+    for my $c (@{$state->{columns}}) {
+        $visible_count++ if $c->{visible};
+    }
+
+    # Don't hide if it's the last visible column
+    if ($visible_count <= 1) {
+        $state->{message} = "Cannot hide last visible column";
+        return;
+    }
+
+    $col->{visible} = 0;
+    $state->{message} = "Hidden column: " . $col->{name};
+
+    # Move to next visible column
+    move_cursor_right($state);
+}
+
+sub unhide_all_columns {
+    my $state = shift;
+    for my $col (@{$state->{columns}}) {
+        $col->{visible} = 1;
+    }
+    $state->{message} = "All columns visible";
+}
+
+sub handle_delete_confirmation {
+    my ($state, $key) = @_;
+
+    if ($key eq 'y' || $key eq 'Y') {
+        delete_selected_jobs($state);
+        $state->{mode} = 'normal';
+    } elsif ($key eq 'n' || $key eq 'N' || $key eq 'CTRL_C' || $key eq 'ESC') {
+        $state->{mode} = 'normal';
+        $state->{message} = "Delete cancelled";
+    }
+}
+
+sub delete_selected_jobs {
+    my $state = shift;
+    my @job_ids = keys %{$state->{selected}};
+
+    if (@job_ids) {
+        my $cmd = "scancel " . join(" ", @job_ids);
+        my $result = system($cmd);
+
+        if ($result == 0) {
+            $state->{message} = sprintf("Deleted %d jobs", scalar @job_ids);
+            $state->{selected} = {};
+            # Reload jobs after deletion
+            sleep 1;  # Give SLURM time to update
+            load_jobs($state);
+        } else {
+            $state->{message} = "Error: scancel failed";
+        }
+    }
+}
+
+# Run main
+main();
+
+__END__
+
+=pod
+
+=head1 NAME
+
+viewjobs - Interactive TUI for viewing and managing SLURM jobs
+
+=head1 SYNOPSIS
+
+  viewjobs
+
+=head1 DESCRIPTION
+
+An interactive terminal user interface (TUI) for viewing and managing SLURM jobs,
+similar to VisiData or less. Provides keyboard navigation, sorting, column management,
+job selection, and deletion capabilities.
+
+=head1 FEATURES
+
+=over 4
+
+=item * Interactive table view with keyboard navigation
+
+=item * Multi-job selection with space bar
+
+=item * Column sorting (ascending/descending)
+
+=item * Dynamic column width adjustment
+
+=item * Column hiding/unhiding
+
+=item * Job deletion with confirmation
+
+=item * Real-time job list refresh
+
+=back
+
+=head1 KEYBOARD SHORTCUTS
+
+=head2 Navigation
+
+=over 4
+
+=item * Arrow keys (↑↓←→) or Vim keys (hjkl) - Move cursor
+
+=item * Page Up/Down - Scroll by page
+
+=item * Home/End or g/G - Jump to top/bottom
+
+=back
+
+=head2 Selection and Actions
+
+=over 4
+
+=item * Space - Toggle job selection
+
+=item * [ - Sort column ascending
+
+=item * ] - Sort column descending
+
+=item * + or = - Increase column width
+
+=item * - - Decrease column width
+
+=item * @ - Hide current column
+
+=item * Ctrl+H - Unhide all columns
+
+=item * d or Ctrl+D - Delete selected jobs (with confirmation)
+
+=item * r or Ctrl+R - Refresh job list
+
+=item * Ctrl+L - Redraw screen
+
+=item * q or Ctrl+C - Quit
+
+=back
+
+=head1 EXAMPLES
+
+=over 4
+
+=item B<Example 1:> Basic usage
+
+  viewjobs
+
+Launch the interactive viewer and navigate with arrow keys.
+
+=item B<Example 2:> Select and delete jobs
+
+  1. Use arrow keys to navigate to a job
+  2. Press Space to select it
+  3. Select additional jobs if needed
+  4. Press 'd' to delete
+  5. Confirm with 'y'
+
+=item B<Example 3:> Sort and customize view
+
+  1. Use left/right arrows to select a column
+  2. Press '[' to sort ascending or ']' for descending
+  3. Press '+' or '-' to adjust column width
+  4. Press '@' to hide unwanted columns
+
+=back
+
+=head1 NOTES
+
+=over 4
+
+=item * Requires a terminal with ANSI color support
+
+=item * Terminal resize requires restarting the application
+
+=item * Array jobs show individual job elements
+
+=back
+
+=head1 SEE ALSO
+
+L<lsjobs>, L<squeue>, L<scancel>
+
+=cut

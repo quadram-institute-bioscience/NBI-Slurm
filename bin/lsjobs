@@ -4,6 +4,7 @@
 
 use v5.12;
 use warnings;
+use utf8;
 use Getopt::Long;
 use FindBin qw($RealBin);
 use Data::Dumper;
@@ -11,6 +12,18 @@ use Term::ANSIColor qw(:constants);
 use File::Basename;
 use Text::ASCIITable;
 $Data::Dumper::Sortkeys = 1;
+
+# Enable UTF-8 output
+binmode(STDOUT, ':utf8');
+binmode(STDERR, ':utf8');
+
+# Box drawing characters for modern table rendering
+my $BOX = {
+    tl => '┌',  tr => '┐',  bl => '└',  br => '┘',  # corners
+    h  => '─',  v  => '│',                           # lines
+    t  => '┬',  b  => '┴',  l  => '├',  r  => '┤',  # T-junctions
+    c  => '┼',                                       # cross
+};
 
 if (-e "$RealBin/../dist.ini") {
     say STDERR "[dev mode] Using local lib"  if ($ENV{"DEBUG"});
@@ -36,24 +49,33 @@ my $opt_verbose_bool = 0;
 my $opt_queue = '.+';
 my $opt_name = '.+';
 my $opt_tab = 0;
+my @opt_hide = ();
 GetOptions(
     'u|user=s'  => \$opt_user,
     'n|name=s'  => \$opt_name,
     's|status=s'=> \$opt_status,
     'r|running' => \$opt_running_bool,
+    'p|pending' => \$opt_pending_bool,
     'd|delete'  => \$opt_delete_bool,
     't|tab'     => \$opt_tab,
+    'hide=s'    => \@opt_hide,
     'verbose'   => \$opt_verbose_bool,
     'version'   => sub { say "lsjobs v", $NBI::Slurm::VERSION; exit },
     'help'      => sub { usage() },
 );
 
 if (not NBI::Slurm::has_squeue()) {
-
-    say STDERR RED, "Error:", RESET, " squeue not found in PATH. Are you in the cluster?";
+    say STDERR RED, "Error: ", RESET, "squeue not found in PATH. Are you in the cluster?";
     exit 1;
 }
+
 my $jobs = getjobs();
+
+# Check if we got any data
+if (not defined $jobs or ref($jobs) ne 'HASH') {
+    say STDERR RED, "Error: ", RESET, "Failed to retrieve job information";
+    exit 1;
+}
 my @ids = ();
 for my $positional (@ARGV) {
     if ($positional =~ /^(\d+)$/) {
@@ -77,13 +99,11 @@ if ($opt_verbose_bool) {
 }
 
 my $selected_jobs = {};
-my $selected_arrays = [['JobID', 'User', 'Queue', 'Name', 'State', 'Time', 'TotalTime', 'NodeList', 'CPUS', 'Memory', 'Reason'],
-                       ['-----', '----', '-----', '----', '-----', '----', '---------', '--------', '----', '------', '------']];
+my $selected_arrays = [['JobID', 'User', 'Queue', 'Name', 'State', 'Time', 'TotalTime', 'NodeList', 'CPUS', 'Memory', 'Reason']];
 
 if ($opt_tab) {
-    # Remove separator line, add "#"
+    # Add "#" prefix for TSV mode
     $selected_arrays->[0]->[0] = "#" . $selected_arrays->[0]->[0];
-    $selected_arrays = [ $selected_arrays->[0] ];
 }
 
 for my $job (sort keys %{$jobs}) {
@@ -100,7 +120,11 @@ for my $job (sort keys %{$jobs}) {
     if ($jobs->{$job}->{NAME} !~ /$opt_name/) {
         next;
     }
-    # Check status
+    # Check status (general pattern match)
+    if ($jobs->{$job}->{STATE} !~ /$opt_status/) {
+        next;
+    }
+    # Check specific status flags (these override general status pattern)
     if ($opt_pending_bool  and $jobs->{$job}->{STATE} ne 'PENDING') {
         next;
     }
@@ -110,31 +134,48 @@ for my $job (sort keys %{$jobs}) {
     if (scalar @ids > 0 and not grep {$_ eq $job} @ids) {
         next;
     }
-    my $array = [$jobs->{$job}->{JOBID} =~/_/ ? substr($jobs->{$job}->{JOBID}, 0, index($jobs->{$job}->{JOBID}, '_'))."#" : $jobs->{$job}->{JOBID},
-                 $jobs->{$job}->{USER},
-                 $jobs->{$job}->{PARTITION},
-                 $jobs->{$job}->{NAME},
-                 $opt_tab ? $jobs->{$job}->{STATE} : state_string($jobs->{$job}->{STATE}),
-                 $jobs->{$job}->{TIME},
-                 $jobs->{$job}->{TIME_LIMIT},
-                 $jobs->{$job}->{NODELIST},
-                 $jobs->{$job}->{"CPUS"},
-                 $jobs->{$job}->{"MIN_MEMORY"},
-                 $opt_tab ? $jobs->{$job}->{"REASON"}  :  reason_string($jobs->{$job}->{"REASON"})
+
+    # Format job ID for display (handle array jobs)
+    my $display_jobid = $jobs->{$job}->{JOBID};
+    if (defined $display_jobid && $display_jobid =~ /_/) {
+        # Array job format: convert "12345_1" to "12345#"
+        $display_jobid =~ s/_.*/#/;
+    }
+
+    my $array = [$display_jobid // 'N/A',
+                 $jobs->{$job}->{USER} // 'N/A',
+                 $jobs->{$job}->{PARTITION} // 'N/A',
+                 $jobs->{$job}->{NAME} // 'N/A',
+                 $opt_tab ? ($jobs->{$job}->{STATE} // 'N/A') : state_string($jobs->{$job}->{STATE} // 'UNKNOWN'),
+                 $jobs->{$job}->{TIME} // '0:00',
+                 $jobs->{$job}->{TIME_LIMIT} // 'N/A',
+                 $jobs->{$job}->{NODELIST} // 'N/A',
+                 $jobs->{$job}->{"CPUS"} // 'N/A',
+                 $jobs->{$job}->{"MIN_MEMORY"} // 'N/A',
+                 $opt_tab ? ($jobs->{$job}->{"REASON"} // 'N/A')  :  reason_string($jobs->{$job}->{"REASON"} // 'None')
                  ];
     push(@{$selected_arrays}, $array); 
 
 
 }
+# Apply column hiding if requested
+if (@opt_hide && !$opt_tab) {
+    $selected_arrays = hide_columns($selected_arrays, \@opt_hide);
+}
+
+# Print summary header (not in tab mode)
+if (!$opt_tab) {
+    print_summary($jobs, $selected_arrays);
+}
+
 if ($opt_tab) {
     for my $array (@{$selected_arrays}) {
         say join("\t", @{$array});
     }
 } else {
-    # Render default table
-    render_table(@{$selected_arrays});
+    # Render modern table with Unicode box drawing
+    render_table_modern(@{$selected_arrays});
     print RESET, "\n";
-
 }
 
 ## Print single job
@@ -159,45 +200,85 @@ if ($opt_delete_bool and (scalar @selected_ids)) {
     say RED "\nDELETE JOBS:", RESET;
     if (prompt("Delete " . scalar(@selected_ids) . " jobs?", 'n') =~ /^(y|Y|yes|YES)$/) {
         my $command = "scancel " . join(" ", @selected_ids);
-        system($command);
-        if ($? == -1) {
-            say RED, "ERROR", RESET ": Failed to delete: $!\n";
+        my $result = system($command);
+        if ($result == -1) {
+            say RED, "ERROR", RESET, ": Failed to execute scancel: $!";
+        } elsif ($result & 127) {
+            say RED, "ERROR", RESET, ": scancel died with signal ", ($result & 127);
+        } elsif (my $exit_code = $result >> 8) {
+            say RED, "ERROR", RESET, ": scancel exited with status $exit_code";
+        } else {
+            say GREEN, "Success", RESET, ": Deleted ", scalar(@selected_ids), " job(s)";
         }
-    } 
+    } else {
+        say "Deletion cancelled.";
+    }
 
 } elsif ($opt_delete_bool) {
-    say STDERR "No jobs selected for deletion";
+    say STDERR YELLOW, "Warning: ", RESET, "No jobs selected for deletion";
 }
 
 sub state_string {
-    my $s = shift;
-    $s = substr($s, 0, 1);
-    my $c = RESET;
-    if ($s =~/^R/) {
-        $c = GREEN . ON_BLACK;
-    } elsif ($s =~/^P/) {
-        $c = YELLOW . ON_BLACK;
+    my $s = shift // 'UNKNOWN';
+    my ($icon, $color, $text);
+
+    if ($s =~ /^R/i) {
+        $icon = '▶';
+        $color = GREEN . BOLD;
+        $text = 'RUN';
+    } elsif ($s =~ /^P/i) {
+        $icon = '◷';
+        $color = YELLOW . BOLD;
+        $text = 'PND';
+    } elsif ($s =~ /^C/i) {
+        $icon = '✓';
+        $color = CYAN . BOLD;
+        $text = 'CMP';
+    } elsif ($s =~ /^F/i) {
+        $icon = '✗';
+        $color = RED . BOLD;
+        $text = 'FLD';
+    } elsif ($s =~ /^S/i) {
+        $icon = '■';
+        $color = RED . BOLD;
+        $text = 'STP';
     } else {
-        $c = RED . ON_BLACK;
+        $icon = '?';
+        $color = WHITE;
+        $text = substr($s, 0, 3);
     }
-    return $c . $s . WHITE .  ON_BLACK;
+
+    return $color . $icon . ' ' . $text . RESET;
 }
 sub reason_string {
+    my $s = shift // 'None';
+    my ($icon, $color);
 
-
-    my $s = shift;
-    my $c = RESET;
-    if ($s =~/^None/) {
-        $c = BLUE . ON_BLACK;
-    } elsif ($s =~/^Priority/) {
-        $c = YELLOW . ON_BLACK;
-    } elsif ($s =~/^Bad/) {
-        $c = WHITE . ON_RED;
+    if ($s =~ /^None/i) {
+        $icon = '✓';
+        $color = CYAN;
+        return $color . $icon . ' ' . $s . RESET;
+    } elsif ($s =~ /^Priority/i) {
+        $icon = '⏳';
+        $color = YELLOW;
+    } elsif ($s =~ /^Resources/i) {
+        $icon = '⚡';
+        $color = YELLOW;
+    } elsif ($s =~ /^Dependency/i) {
+        $icon = '⛓';
+        $color = BLUE;
+    } elsif ($s =~ /^(Bad|Error|Invalid)/i) {
+        $icon = '✗';
+        $color = RED . BOLD;
+    } elsif ($s =~ /^QOS/i) {
+        $icon = '⚠';
+        $color = YELLOW;
     } else {
-        $c = RED . ON_BLACK;
+        $icon = '•';
+        $color = WHITE;
     }
-    return $c . $s . RESET . ON_BLACK;
 
+    return $color . $icon . ' ' . $s . RESET;
 }
 sub joblist_to_ids {
     # Receive a list of lists (all same length) and returns a list of jobids
@@ -233,6 +314,190 @@ sub short_job {
     return $line;
 }
 
+sub print_summary {
+    my ($jobs, $selected_arrays) = @_;
+    my %stats = (running => 0, pending => 0, completed => 0, failed => 0, other => 0);
+
+    # Count job states
+    for my $job (values %$jobs) {
+        my $state = $job->{STATE} // '';
+        if ($state =~ /^R/i) {
+            $stats{running}++;
+        } elsif ($state =~ /^P/i) {
+            $stats{pending}++;
+        } elsif ($state =~ /^C/i) {
+            $stats{completed}++;
+        } elsif ($state =~ /^F/i) {
+            $stats{failed}++;
+        } else {
+            $stats{other}++;
+        }
+    }
+
+    my $total = scalar(keys %$jobs);
+    my $showing = scalar(@$selected_arrays) - 1;  # -1 for header row
+
+    say '';
+    say BOLD . CYAN . '╔════════════════════════════════════════════════════════════════╗' . RESET;
+    say BOLD . CYAN . '║' . RESET . '  ' . BOLD . 'SLURM Job Queue Summary' . RESET . ' ' x 38 . BOLD . CYAN . '║' . RESET;
+    say BOLD . CYAN . '╚════════════════════════════════════════════════════════════════╝' . RESET;
+    say '';
+
+    # Stats line
+    my @stat_parts;
+    push @stat_parts, sprintf('%s %-9s %s%3d%s',
+        GREEN . BOLD . '▶' . RESET, 'Running:', GREEN . BOLD, $stats{running}, RESET) if $stats{running};
+    push @stat_parts, sprintf('%s %-9s %s%3d%s',
+        YELLOW . BOLD . '◷' . RESET, 'Pending:', YELLOW . BOLD, $stats{pending}, RESET) if $stats{pending};
+    push @stat_parts, sprintf('%s %-9s %s%3d%s',
+        CYAN . '✓' . RESET, 'Complete:', CYAN, $stats{completed}, RESET) if $stats{completed};
+    push @stat_parts, sprintf('%s %-9s %s%3d%s',
+        RED . BOLD . '✗' . RESET, 'Failed:', RED . BOLD, $stats{failed}, RESET) if $stats{failed};
+    push @stat_parts, sprintf('%s %-9s %s%3d%s',
+        WHITE . '•' . RESET, 'Other:', WHITE, $stats{other}, RESET) if $stats{other};
+
+    if (@stat_parts) {
+        say '  ' . join('  ', @stat_parts);
+    }
+
+    say '';
+    say sprintf('  %s Showing: %s%d%s of %s%d%s total jobs',
+        CYAN . BOLD . '→' . RESET,
+        BOLD . CYAN, $showing, RESET,
+        BOLD, $total, RESET
+    );
+    say '';
+}
+
+sub hide_columns {
+    my ($arrays_ref, $hide_patterns) = @_;
+    return $arrays_ref unless @$hide_patterns;
+
+    my @arrays = @$arrays_ref;
+    return \@arrays unless @arrays;
+
+    my $header = $arrays[0];
+    my @keep_indices;
+
+    # Determine which columns to keep
+    for my $i (0..$#{$header}) {
+        my $col_name = $header->[$i];
+        my $should_hide = 0;
+
+        for my $pattern (@$hide_patterns) {
+            # Case insensitive substring match (minimum 3 chars)
+            if (length($pattern) >= 3 && $col_name =~ /\Q$pattern\E/i) {
+                $should_hide = 1;
+                last;
+            }
+        }
+
+        push @keep_indices, $i unless $should_hide;
+    }
+
+    # If all columns would be hidden, keep them all
+    return \@arrays unless @keep_indices;
+
+    # Filter each row to keep only non-hidden columns
+    my @filtered_arrays;
+    for my $row (@arrays) {
+        my @filtered_row = map { $row->[$_] } @keep_indices;
+        push @filtered_arrays, \@filtered_row;
+    }
+
+    return \@filtered_arrays;
+}
+
+sub render_table_modern {
+    # Receive a list of lists (all same length) and print a modern table with Unicode borders
+    my @rows = @_;
+    return unless @rows;
+
+    my $n_cols = scalar(@{$rows[0]});
+    my $line_width = get_terminal_width() - $n_cols - 1;
+
+    # Calculate maximum widths for each column
+    my @max_widths = ();
+    for my $col (0..$n_cols-1) {
+        my $max_width = 0;
+        for my $row (@rows) {
+            my $width = ascii_len($row->[$col]);
+            $max_width = $width if ($width > $max_width);
+        }
+        push(@max_widths, $max_width);
+    }
+
+    # Print top border
+    print_border_line('top', \@max_widths);
+
+    # Print header row (first row)
+    if (@rows > 0) {
+        print_table_row($rows[0], \@max_widths, 'header');
+        print_border_line('middle', \@max_widths);
+    }
+
+    # Print data rows
+    for my $i (1..$#rows) {
+        print_table_row($rows[$i], \@max_widths, 'data');
+    }
+
+    # Print bottom border
+    print_border_line('bottom', \@max_widths);
+}
+
+sub print_border_line {
+    my ($type, $widths) = @_;
+    my ($left, $mid, $right, $fill);
+
+    if ($type eq 'top') {
+        ($left, $mid, $right, $fill) = ($BOX->{tl}, $BOX->{t}, $BOX->{tr}, $BOX->{h});
+    } elsif ($type eq 'middle') {
+        ($left, $mid, $right, $fill) = ($BOX->{l}, $BOX->{c}, $BOX->{r}, $BOX->{h});
+    } else {  # bottom
+        ($left, $mid, $right, $fill) = ($BOX->{bl}, $BOX->{b}, $BOX->{br}, $BOX->{h});
+    }
+
+    print CYAN . $left . RESET;
+    for my $i (0..$#{$widths}) {
+        print CYAN . ($fill x ($widths->[$i] + 2)) . RESET;
+        print CYAN . ($i == $#{$widths} ? $right : $mid) . RESET;
+    }
+    say '';
+}
+
+sub print_table_row {
+    my ($row, $widths, $style) = @_;
+
+    print CYAN . $BOX->{v} . RESET;
+    for my $i (0..$#{$row}) {
+        my $cell = $row->[$i];
+        my $stripped = $cell;
+        $stripped =~ s/\e\[[0-9;]*m//g;  # Strip ANSI codes
+
+        my $cell_width = length($stripped);
+        my $padding = $widths->[$i] - $cell_width;
+
+        # Apply header styling
+        my $prefix = '';
+        if ($style eq 'header') {
+            $prefix = BOLD . WHITE;
+        }
+
+        # Build the cell content
+        my $tmpline = sprintf(" %s%-*s ", $prefix, $widths->[$i], $stripped);
+
+        # Replace stripped version with original (preserving ANSI codes)
+        my $index = index($tmpline, $stripped);
+        if ($index >= 0) {
+            substr($tmpline, $index, length($stripped), $cell);
+        }
+
+        print $tmpline . RESET;
+        print CYAN . $BOX->{v} . RESET;
+    }
+    say '';
+}
+
 sub render_table {
     # Receive a list of lists (all same length) and print a table not larger than $line_width
     
@@ -258,7 +523,7 @@ sub render_table {
             my $cell = $row->[$col];
             my $stripped = $cell;
             $stripped  =~  s/\e\[[0-9;]*m//g;
-            my $tmpline .= sprintf("|%-${width}s ", $stripped);
+            my $tmpline = sprintf("|%-${width}s ", $stripped);
             # In tmpline replace $stripped with $cell, without using regex
             my $index = index($tmpline, $stripped);
             substr($tmpline, $index, length($stripped), $cell);
@@ -290,12 +555,22 @@ sub extractJobByID {
 sub getjobs {
     # Create an anonymous hash, and return it
     my $jobs = {};
-    my $cmd = q(squeue --format='%all');
-    my @output = `$cmd`;
+    # Use specific format for efficiency - only get fields we need
+    my $cmd = q(squeue --format='%i|%u|%P|%j|%T|%M|%l|%N|%C|%m|%r');
+    my @output = `$cmd 2>&1`;
+
+    # Check if command failed
+    if ($? != 0) {
+        say STDERR RED, "Error: ", RESET, "Failed to execute squeue command";
+        say STDERR "Output: ", join("\n", @output) if @output;
+        return $jobs;
+    }
+
     my $c = 0;
     my @header = ();
     for my $line (@output) {
         chomp $line;
+        next if $line =~ /^\s*$/;  # Skip empty lines
 
         my @fields = split(/\|/, $line);
         $c++;
@@ -308,30 +583,44 @@ sub getjobs {
             # Job info
             my $job = {};
             if (scalar(@fields) != scalar(@header)) {
-                say STDERR "Error: number of fields in header and line do not match";
-                say STDERR "Header: ", scalar(@header);
-                say STDERR "Line: ", scalar(@fields);
-                say STDERR "Line: $line";
-                exit;
+                say STDERR YELLOW, "Warning: ", RESET, "Skipping malformed line (field count mismatch)";
+                if ($ENV{DEBUG}) {
+                    say STDERR "  Expected: ", scalar(@header), " fields";
+                    say STDERR "  Got: ", scalar(@fields), " fields";
+                    say STDERR "  Line: $line";
+                }
+                next;  # Skip this line instead of exiting
             }
             for my $i (0..$#header) {
                 $job->{"$header[$i]"} = $fields[$i] if (not defined $job->{"$header[$i]"});
             }
 
-            $jobs->{$job->{JOBID}} = $job;
-            
+            # Ensure we have a valid JOBID before adding
+            if (defined $job->{JOBID} && $job->{JOBID} ne '') {
+                $jobs->{$job->{JOBID}} = $job;
+            } else {
+                say STDERR YELLOW, "Warning: ", RESET, "Skipping job with missing JOBID" if $ENV{DEBUG};
+            }
+
         }
-        
+
     }
-    
+
     return $jobs;
 }
 
 
 sub get_terminal_width {
-    my $terminal_width = `tput cols`;
-    chomp($terminal_width);
-    return $terminal_width > 20 ? $terminal_width : 80;
+    my $terminal_width = `tput cols 2>/dev/null`;
+    chomp($terminal_width) if defined $terminal_width;
+
+    # Validate that we got a positive integer
+    if (defined $terminal_width && $terminal_width =~ /^\d+$/ && $terminal_width > 20) {
+        return $terminal_width;
+    }
+
+    # Fallback to default width
+    return 80;
 }
 
 sub stripchars {
@@ -358,16 +647,22 @@ sub usage {
   Options:
    -u, --user <username>   Show only jobs from this user [default: $unix_username]
                            Type 'all' to show all users
-                           
-   -n, --name <pattern>    Show only jobs with this name [default: .+]
-  
-   -s, --status <pattern>  Show only jobs with this status [default: .+]
+
+   -n, --name <pattern>    Show only jobs with this name (regex) [default: .+]
+
+   -s, --status <pattern>  Show only jobs matching this status (regex) [default: .+]
    -r, --running           Show only running jobs
    -p, --pending           Show only pending jobs
    -t, --tab               Output in simple TSV format (pipe to vd for interactive table)
 
-   -d, --delete            Delete the selected jobs
+   --hide <column>         Hide column from display (case insensitive substring match,
+                           minimum 3 characters). Can be specified multiple times.
+                           Examples: --hide time --hide memory --hide nodelist
+
+   -d, --delete            Delete the selected jobs (with confirmation prompt)
    --verbose               Show verbose output
+   --version               Show version and exit
+   --help                  Show this help message
 END
     exit;
 
@@ -400,15 +695,23 @@ Show only jobs with the specified name pattern. Default: .+ (matches any name).
 
 =item B<-s, --status <pattern>>
 
-Show only jobs with the specified status pattern. Default: .+ (matches any status).
+Show only jobs with the specified status pattern (regex). Default: .+ (matches any status).
 
 =item B<-r, --running>
 
-Show only running jobs.
+Show only running jobs. This is a convenience flag equivalent to C<-s RUNNING>.
+
+=item B<-p, --pending>
+
+Show only pending jobs. This is a convenience flag equivalent to C<-s PENDING>.
 
 =item B<-t, --tab>
 
 Output in simple TSV format (tip: pipe to C<vd> for interactive table)
+
+=item B<--hide <column>>
+
+Hide specified column from display. Uses case-insensitive substring matching with a minimum of 3 characters. Can be specified multiple times to hide multiple columns. Examples: C<--hide time --hide memory --hide nodelist>
 
 =item B<-d, --delete>
 
@@ -462,6 +765,12 @@ List running jobs of a specific user:
 
 Delete some of my jobs (only pending, and with name containing MEGAHIT):
 
-  lsjobs -d --pending MEGAHIT 
+  lsjobs -d --pending MEGAHIT
+
+=item B<Example 5:>
+
+List jobs with a simplified view (hide some columns):
+
+  lsjobs --hide nodelist --hide reason --hide totaltime
 
 =back
