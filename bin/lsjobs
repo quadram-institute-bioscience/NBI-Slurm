@@ -909,3 +909,9 @@ List jobs with a simplified view (hide some columns):
   lsjobs --hide nodelist --hide reason --hide totaltime
 
 =back
+
+=head1 SEE ALSO
+
+L<viewjobs>
+
+=cut
