@@ -5,6 +5,11 @@ use v5.12;
 use warnings;
 use Term::ANSIColor;
 use Getopt::Long;
+use FindBin qw($RealBin);
+if (-e "$RealBin/../dist.ini") {
+    say STDERR "[dev mode] Using local lib" if ($ENV{"DEBUG"});
+    use lib "$RealBin/../lib";
+}
 use NBI::Slurm;
 # Define help function
 sub show_help {
