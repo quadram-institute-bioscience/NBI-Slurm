@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doi_batch xmlns="http://www.crossref.org/schema/5.3.1"
+           xmlns:ai="http://www.crossref.org/AccessIndicators.xsd"
+           xmlns:rel="http://www.crossref.org/relations.xsd"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           version="5.3.1"
+           xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd">
+  <head>
+    <doi_batch_id>20260319084835-655d6bb9895472263a6864b8e45185394a9009cf</doi_batch_id>
+    <timestamp>20260319084835</timestamp>
+    <depositor>
+      <depositor_name>JOSS Admin</depositor_name>
+      <email_address>admin@theoj.org</email_address>
+    </depositor>
+    <registrant>The Open Journal</registrant>
+  </head>
+  <body>
+    <journal>
+      <journal_metadata>
+        <full_title>Journal of Open Source Software</full_title>
+        <abbrev_title>JOSS</abbrev_title>
+        <issn media_type="electronic">2475-9066</issn>
+        <doi_data>
+          <doi>10.21105/joss</doi>
+          <resource>https://joss.theoj.org</resource>
+        </doi_data>
+      </journal_metadata>
+      <journal_issue>
+        <publication_date media_type="online">
+          <month>01</month>
+          <year>1970</year>
+        </publication_date>
+        <journal_volume>
+          <volume>¿VOL?</volume>
+        </journal_volume>
+        <issue>¿ISSUE?</issue>
+      </journal_issue>
+      <journal_article publication_type="full_text">
+        <titles>
+          <title>NBI-Slurm: Simplified submission of Slurm jobs with energy saving mode</title>
+        </titles>
+        <contributors>
+          <person_name sequence="first" contributor_role="author">
+            <given_name>Andrea</given_name>
+            <surname>Telatin</surname>
+            <affiliations>
+              <institution><institution_name>Quadram Institute Bioscience, Norwich, UK</institution_name></institution>
+            </affiliations>
+            <ORCID>https://orcid.org/0000-0001-7619-281X</ORCID>
+          </person_name>
+        </contributors>
+        <publication_date>
+          <month>01</month>
+          <day>01</day>
+          <year>1970</year>
+        </publication_date>
+        <pages>
+          <first_page>¿PAGE?</first_page>
+        </pages>
+        <publisher_item>
+          <identifier id_type="doi">N/A</identifier>
+        </publisher_item>
+        <ai:program name="AccessIndicators">
+          <ai:license_ref applies_to="vor">http://creativecommons.org/licenses/by/4.0/</ai:license_ref>
+          <ai:license_ref applies_to="am">http://creativecommons.org/licenses/by/4.0/</ai:license_ref>
+          <ai:license_ref applies_to="tdm">http://creativecommons.org/licenses/by/4.0/</ai:license_ref>
+        </ai:program>
+        <rel:program>
+          <rel:related_item>
+            <rel:description>Software archive</rel:description>
+            <rel:inter_work_relation relationship-type="references" identifier-type="doi">10.5281</rel:inter_work_relation>
+          </rel:related_item>
+          <rel:related_item>
+            <rel:description>GitHub review issue</rel:description>
+            <rel:inter_work_relation relationship-type="hasReview" identifier-type="uri">https://github.com/openjournals</rel:inter_work_relation>
+          </rel:related_item>
+        </rel:program>
+        <doi_data>
+          <doi>N/A</doi>
+          <resource>https://joss.theoj.org/papers/N/A</resource>
+          <collection property="text-mining">
+            <item>
+              <resource mime_type="application/pdf">https://joss.theoj.org/papers/N/A.pdf</resource>
+            </item>
+          </collection>
+        </doi_data>
+        <citation_list>
+          <citation key="jette2002slurm">
+            <article_title>SLURM: Simple linux utility for resource management</article_title>
+            <author>Yoo</author>
+            <journal_title>Job scheduling strategies for parallel processing</journal_title>
+            <doi>10.1007/10968987_3</doi>
+            <issn>1611-3349</issn>
+            <isbn>9783540397274</isbn>
+            <cYear>2003</cYear>
+            <unstructured_citation>Yoo, A. B., Jette, M. A., &amp; Grondona, M. (2003). SLURM: Simple linux utility for resource management. Job Scheduling Strategies for Parallel Processing, 44–60. https://doi.org/10.1007/10968987_3</unstructured_citation>
+          </citation>
+          <citation key="molder2021snakemake">
+            <article_title>Sustainable data analysis with snakemake</article_title>
+            <author>Mölder</author>
+            <journal_title>F1000Research</journal_title>
+            <volume>10</volume>
+            <doi>10.12688/f1000research.29032.2</doi>
+            <issn>2046-1402</issn>
+            <cYear>2021</cYear>
+            <unstructured_citation>Mölder, F., Jablonski, K. P., Letcher, B., Hall, M. B., Tomkins-Tinch, C. H., Sochat, V., Forster, J., Lee, S., Twardziok, S. O., Kanitz, A., Wilm, A., Holtgrewe, M., Rahmann, S., Nahnsen, S., &amp; Köster, J. (2021). Sustainable data analysis with snakemake. F1000Research, 10, 33. https://doi.org/10.12688/f1000research.29032.2</unstructured_citation>
+          </citation>
+          <citation key="di2017nextflow">
+            <article_title>Nextflow enables reproducible computational workflows</article_title>
+            <author>Di Tommaso</author>
+            <journal_title>Nature Biotechnology</journal_title>
+            <issue>4</issue>
+            <volume>35</volume>
+            <doi>10.1038/nbt.3820</doi>
+            <cYear>2017</cYear>
+            <unstructured_citation>Di Tommaso, P., Chatzou, M., Floden, E. W., Barja, P. P., Palumbo, E., &amp; Notredame, C. (2017). Nextflow enables reproducible computational workflows. Nature Biotechnology, 35(4), 316–319. https://doi.org/10.1038/nbt.3820</unstructured_citation>
+          </citation>
+          <citation key="lannelongue2021green">
+            <article_title>Green algorithms: Quantifying the carbon footprint of computation</article_title>
+            <author>Lannelongue</author>
+            <journal_title>Advanced Science</journal_title>
+            <issue>12</issue>
+            <volume>8</volume>
+            <doi>10.1002/advs.202100707</doi>
+            <issn>2198-3844</issn>
+            <cYear>2021</cYear>
+            <unstructured_citation>Lannelongue, L., Grealey, J., &amp; Inouye, M. (2021). Green algorithms: Quantifying the carbon footprint of computation. Advanced Science, 8(12). https://doi.org/10.1002/advs.202100707</unstructured_citation>
+          </citation>
+          <citation key="slurm_adoption">
+            <article_title>A survey of system scheduling for HPC and big data</article_title>
+            <author>Wang</author>
+            <journal_title>Proceedings of the 2020 4th international conference on high performance compilation, computing and communications</journal_title>
+            <doi>10.1145/3407947.3407977</doi>
+            <cYear>2020</cYear>
+            <unstructured_citation>Wang, B., Chen, Z., &amp; Xiao, N. (2020). A survey of system scheduling for HPC and big data. Proceedings of the 2020 4th International Conference on High Performance Compilation, Computing and Communications, 178–183. https://doi.org/10.1145/3407947.3407977</unstructured_citation>
+          </citation>
+        </citation_list>
+      </journal_article>
+    </journal>
+  </body>
+</doi_batch>
