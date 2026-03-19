@@ -6,8 +6,8 @@
            version="5.3.1"
            xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd">
   <head>
-    <doi_batch_id>20260319084835-655d6bb9895472263a6864b8e45185394a9009cf</doi_batch_id>
-    <timestamp>20260319084835</timestamp>
+    <doi_batch_id>20260319093245-655d6bb9895472263a6864b8e45185394a9009cf</doi_batch_id>
+    <timestamp>20260319093245</timestamp>
     <depositor>
       <depositor_name>JOSS Admin</depositor_name>
       <email_address>admin@theoj.org</email_address>
@@ -44,7 +44,8 @@
             <given_name>Andrea</given_name>
             <surname>Telatin</surname>
             <affiliations>
-              <institution><institution_name>Quadram Institute Bioscience, Norwich, UK</institution_name></institution>
+              <institution><institution_name>Quadram Institute Bioscience, Norwich, NR4 7UQ, UK</institution_name><institution_id type="ror">https://ror.org/04td3ys19</institution_id></institution>
+              <institution><institution_name>Center for Microbial Interactions, Norwich Research Park, Norwich, NR4 7UG, UK</institution_name></institution>
             </affiliations>
             <ORCID>https://orcid.org/0000-0001-7619-281X</ORCID>
           </person_name>

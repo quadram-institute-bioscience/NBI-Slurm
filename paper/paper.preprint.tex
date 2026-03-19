@@ -1,0 +1,507 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\PassOptionsToPackage{dvipsnames,svgnames,x11names}{xcolor}
+%
+\documentclass[
+]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{lmodern}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\newenvironment{Shaded}{}{}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.49,0.56,0.16}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\BuiltInTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{#1}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.53,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.56,0.13,0.00}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.73,0.13,0.13}{\textit{#1}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.02,0.16,0.49}{#1}}
+\newcommand{\ImportTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{\textbf{#1}}}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.40,0.40,0.40}{#1}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.74,0.48,0.00}{#1}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.73,0.40,0.53}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.10,0.09,0.49}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\usepackage{longtable,booktabs,array}
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+% Set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+% definitions for citeproc citations
+\NewDocumentCommand\citeproctext{}{}
+\NewDocumentCommand\citeproc{mm}{%
+  \begingroup\def\citeproctext{#2}\cite{#1}\endgroup}
+\makeatletter
+ % allow citations to break across lines
+ \let\@cite@ofmt\@firstofone
+ % avoid brackets around text for \cite:
+ \def\@biblabel#1{}
+ \def\@cite#1#2{{#1\if@tempswa , #2\fi}}
+\makeatother
+\newlength{\cslhangindent}
+\setlength{\cslhangindent}{1.5em}
+\newlength{\csllabelwidth}
+\setlength{\csllabelwidth}{3em}
+\newenvironment{CSLReferences}[2] % #1 hanging-indent, #2 entry-spacing
+ {\begin{list}{}{%
+  \setlength{\itemindent}{0pt}
+  \setlength{\leftmargin}{0pt}
+  \setlength{\parsep}{0pt}
+  % turn on hanging indent if param 1 is 1
+  \ifodd #1
+   \setlength{\leftmargin}{\cslhangindent}
+   \setlength{\itemindent}{-1\cslhangindent}
+  \fi
+  % set entry spacing
+  \setlength{\itemsep}{#2\baselineskip}}}
+ {\end{list}}
+\usepackage{calc}
+\newcommand{\CSLBlock}[1]{\hfill\break\parbox[t]{\linewidth}{\strut\ignorespaces#1\strut}}
+\newcommand{\CSLLeftMargin}[1]{\parbox[t]{\csllabelwidth}{\strut#1\strut}}
+\newcommand{\CSLRightInline}[1]{\parbox[t]{\linewidth - \csllabelwidth}{\strut#1\strut}}
+\newcommand{\CSLIndent}[1]{\hspace{\cslhangindent}#1}
+\ifLuaTeX
+\usepackage[bidi=basic]{babel}
+\else
+\usepackage[bidi=default]{babel}
+\fi
+\babelprovide[main,import]{american}
+% get rid of language-specific shorthands (see #6817):
+\let\LanguageShortHands\languageshorthands
+\def\languageshorthands#1{}
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same} % disable monospaced font for URLs
+\hypersetup{
+  pdftitle={NBI-Slurm: Simplified submission of Slurm jobs with energy
+saving mode},
+  pdfauthor={Andrea Telatin},
+  pdflang={en-US},
+  colorlinks=true,
+  linkcolor={Maroon},
+  filecolor={Maroon},
+  citecolor={Blue},
+  urlcolor={Blue},
+  pdfcreator={LaTeX via pandoc}}
+
+\title{NBI-Slurm: Simplified submission of Slurm jobs with energy saving
+mode}
+
+\definecolor{c53baa1}{RGB}{83,186,161}
+\definecolor{c202826}{RGB}{32,40,38}
+\def \rorglobalscale {0.1}
+\newcommand{\rorlogo}{%
+\begin{tikzpicture}[y=1cm, x=1cm, yscale=\rorglobalscale,xscale=\rorglobalscale, every node/.append style={scale=\rorglobalscale}, inner sep=0pt, outer sep=0pt]
+  \begin{scope}[even odd rule,line join=round,miter limit=2.0,shift={(-0.025, 0.0216)}]
+    \path[fill=c53baa1,nonzero rule,line join=round,miter limit=2.0] (1.8164, 3.012) -- (1.4954, 2.5204) -- (1.1742, 3.012) -- (1.8164, 3.012) -- cycle;
+    \path[fill=c53baa1,nonzero rule,line join=round,miter limit=2.0] (3.1594, 3.012) -- (2.8385, 2.5204) -- (2.5172, 3.012) -- (3.1594, 3.012) -- cycle;
+    \path[fill=c53baa1,nonzero rule,line join=round,miter limit=2.0] (1.1742, 0.0669) -- (1.4954, 0.5588) -- (1.8164, 0.0669) -- (1.1742, 0.0669) -- cycle;
+    \path[fill=c53baa1,nonzero rule,line join=round,miter limit=2.0] (2.5172, 0.0669) -- (2.8385, 0.5588) -- (3.1594, 0.0669) -- (2.5172, 0.0669) -- cycle;
+    \path[fill=c202826,nonzero rule,line join=round,miter limit=2.0] (3.8505, 1.4364).. controls (3.9643, 1.4576) and (4.0508, 1.5081) .. (4.1098, 1.5878).. controls (4.169, 1.6674) and (4.1984, 1.7642) .. (4.1984, 1.8777).. controls (4.1984, 1.9719) and (4.182, 2.0503) .. (4.1495, 2.1132).. controls (4.1169, 2.1762) and (4.0727, 2.2262) .. (4.0174, 2.2635).. controls (3.9621, 2.3006) and (3.8976, 2.3273) .. (3.824, 2.3432).. controls (3.7505, 2.359) and (3.6727, 2.367) .. (3.5909, 2.367) -- (2.9676, 2.367) -- (2.9676, 1.8688).. controls (2.9625, 1.8833) and (2.9572, 1.8976) .. (2.9514, 1.9119).. controls (2.9083, 2.0164) and (2.848, 2.1056) .. (2.7705, 2.1791).. controls (2.6929, 2.2527) and (2.6014, 2.3093) .. (2.495, 2.3487).. controls (2.3889, 2.3881) and (2.2728, 2.408) .. (2.1468, 2.408).. controls (2.0209, 2.408) and (1.905, 2.3881) .. (1.7986, 2.3487).. controls (1.6925, 2.3093) and (1.6007, 2.2527) .. (1.5232, 2.1791).. controls (1.4539, 2.1132) and (1.3983, 2.0346) .. (1.3565, 1.9436).. controls (1.3504, 2.009) and (1.3351, 2.0656) .. (1.3105, 2.1132).. controls (1.2779, 2.1762) and (1.2338, 2.2262) .. (1.1785, 2.2635).. controls (1.1232, 2.3006) and (1.0586, 2.3273) .. (0.985, 2.3432).. controls (0.9115, 2.359) and (0.8337, 2.367) .. (0.7519, 2.367) -- (0.1289, 2.367) -- (0.1289, 0.7562) -- (0.4837, 0.7562) -- (0.4837, 1.4002) -- (0.6588, 1.4002) -- (0.9956, 0.7562) -- (1.4211, 0.7562) -- (1.0118, 1.4364).. controls (1.1255, 1.4576) and (1.2121, 1.5081) .. (1.2711, 1.5878).. controls (1.2737, 1.5915) and (1.2761, 1.5954) .. (1.2787, 1.5991).. controls (1.2782, 1.5867) and (1.2779, 1.5743) .. (1.2779, 1.5616).. controls (1.2779, 1.4327) and (1.2996, 1.3158) .. (1.3428, 1.2113).. controls (1.3859, 1.1068) and (1.4462, 1.0176) .. (1.5237, 0.944).. controls (1.601, 0.8705) and (1.6928, 0.8139) .. (1.7992, 0.7744).. controls (1.9053, 0.735) and (2.0214, 0.7152) .. (2.1474, 0.7152).. controls (2.2733, 0.7152) and (2.3892, 0.735) .. (2.4956, 0.7744).. controls (2.6016, 0.8139) and (2.6935, 0.8705) .. (2.771, 0.944).. controls (2.8482, 1.0176) and (2.9086, 1.1068) .. (2.952, 1.2113).. controls (2.9578, 1.2253) and (2.9631, 1.2398) .. (2.9681, 1.2544) -- (2.9681, 0.7562) -- (3.3229, 0.7562) -- (3.3229, 1.4002) -- (3.4981, 1.4002) -- (3.8349, 0.7562) -- (4.2603, 0.7562) -- (3.8505, 1.4364) -- cycle(0.9628, 1.7777).. controls (0.9438, 1.7534) and (0.92, 1.7357) .. (0.8911, 1.7243).. controls (0.8623, 1.7129) and (0.83, 1.706) .. (0.7945, 1.7039).. controls (0.7588, 1.7015) and (0.7252, 1.7005) .. (0.6932, 1.7005) -- (0.4839, 1.7005) -- (0.4839, 2.0667) -- (0.716, 2.0667).. controls (0.7477, 2.0667) and (0.7805, 2.0643) .. (0.8139, 2.0598).. controls (0.8472, 2.0553) and (0.8768, 2.0466) .. (0.9025, 2.0336).. controls (0.9282, 2.0206) and (0.9496, 2.0021) .. (0.9663, 1.9778).. controls (0.9829, 1.9534) and (0.9914, 1.9209) .. (0.9914, 1.8799).. controls (0.9914, 1.8362) and (0.9819, 1.8021) .. (0.9628, 1.7777) -- cycle(2.6125, 1.3533).. controls (2.5889, 1.2904) and (2.5553, 1.2359) .. (2.5112, 1.1896).. controls (2.4672, 1.1433) and (2.4146, 1.1073) .. (2.3529, 1.0814).. controls (2.2916, 1.0554) and (2.2228, 1.0427) .. (2.1471, 1.0427).. controls (2.0712, 1.0427) and (2.0026, 1.0557) .. (1.9412, 1.0814).. controls (1.8799, 1.107) and (1.8272, 1.1433) .. (1.783, 1.1896).. controls (1.7391, 1.2359) and (1.7052, 1.2904) .. (1.6817, 1.3533).. controls (1.6581, 1.4163) and (1.6465, 1.4856) .. (1.6465, 1.5616).. controls (1.6465, 1.6359) and (1.6581, 1.705) .. (1.6817, 1.7687).. controls (1.7052, 1.8325) and (1.7388, 1.8873) .. (1.783, 1.9336).. controls (1.8269, 1.9799) and (1.8796, 2.0159) .. (1.9412, 2.0418).. controls (2.0026, 2.0675) and (2.0712, 2.0804) .. (2.1471, 2.0804).. controls (2.223, 2.0804) and (2.2916, 2.0675) .. (2.3529, 2.0418).. controls (2.4143, 2.0161) and (2.467, 1.9799) .. (2.5112, 1.9336).. controls (2.5551, 1.8873) and (2.5889, 1.8322) .. (2.6125, 1.7687).. controls (2.636, 1.705) and (2.6477, 1.6359) .. (2.6477, 1.5616).. controls (2.6477, 1.4856) and (2.636, 1.4163) .. (2.6125, 1.3533) -- cycle(3.8015, 1.7777).. controls (3.7825, 1.7534) and (3.7587, 1.7357) .. (3.7298, 1.7243).. controls (3.701, 1.7129) and (3.6687, 1.706) .. (3.6333, 1.7039).. controls (3.5975, 1.7015) and (3.5639, 1.7005) .. (3.5319, 1.7005) -- (3.3226, 1.7005) -- (3.3226, 2.0667) -- (3.5547, 2.0667).. controls (3.5864, 2.0667) and (3.6192, 2.0643) .. (3.6526, 2.0598).. controls (3.6859, 2.0553) and (3.7155, 2.0466) .. (3.7412, 2.0336).. controls (3.7669, 2.0206) and (3.7883, 2.0021) .. (3.805, 1.9778).. controls (3.8216, 1.9534) and (3.8301, 1.9209) .. (3.8301, 1.8799).. controls (3.8301, 1.8362) and (3.8206, 1.8021) .. (3.8015, 1.7777) -- cycle;
+  \end{scope}
+\end{tikzpicture}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Authors and Affiliations
+
+\usepackage[affil-it]{authblk}
+\usepackage{orcidlink}
+%% \renewcommand\Authsep{, }
+\setlength{\affilsep}{1em}
+\author[1,2%
+  %
+  ]{Andrea Telatin%
+    \,\orcidlink{0000-0001-7619-281X}\,%
+    }
+
+\affil[1]{Quadram Institute Bioscience, Norwich, NR4 7UQ, UK%
+    \,\protect\href{https://ror.org/04td3ys19}{\protect\rorlogo}\,%
+  }
+\affil[2]{Center for Microbial Interactions, Norwich Research Park,
+Norwich, NR4 7UG, UK%
+  }
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\date{18 March 2026}
+
+\begin{document}
+\maketitle
+
+\section{Summary}\label{summary}
+
+NBI-Slurm is a Perl package that provides a simplified, user-friendly
+interface for submitting and managing jobs on SLURM
+(\citeproc{ref-jette2002slurm}{Yoo et al., 2003}) high-performance
+computing (HPC) clusters. It offers both a library of Perl modules for
+programmatic job management and a suite of command-line tools designed
+to reduce the cognitive overhead of SLURM's native interface. Two
+distinctive features of NBI-Slurm are TUI applications to view and
+cancel jobs, and an energy-aware scheduling mode --- ``eco mode'' ---
+that automatically defers flexible jobs to off-peak periods, helping
+research institutions reduce their computational carbon footprint
+without requiring users to manually plan submission times.
+
+\section{Statement of Need}\label{statement-of-need}
+
+HPC clusters are indispensable in modern research, particularly in the
+life sciences where large-scale sequence analyses, genome assemblies,
+and statistical models demand resources beyond a desktop workstation.
+SLURM has become the dominant workload manager in this space
+(\citeproc{ref-slurm_adoption}{Wang et al., 2020}), yet its interface
+presents a steep learning curve. Users must learn a verbose
+\texttt{sbatch} scripting syntax, understand resource unit conventions
+(memory in megabytes, time in \texttt{D-HH:MM:SS} format), manage job
+dependencies manually, and repeat boilerplate directives across every
+submission script.
+
+Workflow managers such as Snakemake
+(\citeproc{ref-molder2021snakemake}{Mölder et al., 2021}) and Nextflow
+(\citeproc{ref-di2017nextflow}{Di Tommaso et al., 2017}) address this at
+the pipeline level by abstracting SLURM as an execution backend, but
+they require users to rewrite their analysis logic inside a
+domain-specific language. Many researchers have existing shell scripts
+or one-off analyses that do not warrant a full pipeline refactor.
+NBI-Slurm occupies a complementary niche: it wraps SLURM's interface
+without imposing a workflow model, making it straightforward to submit
+individual commands or small batches while retaining access to all SLURM
+features through pass-through options.
+
+The \texttt{lsjobs} utility prints a colour-coded, human-readable table
+of queued jobs as a static snapshot, offering a more ergonomic
+alternative to the raw output of \texttt{squeue}. Its companion tool
+\texttt{viewjobs} provides a fully interactive terminal user interface
+(TUI) that allows users to browse the live job queue without leaving the
+terminal (\autoref{fig:viewjobs}). Users can scroll through jobs with
+arrow or Vim keys, sort columns, inspect per-job details, toggle column
+visibility, and adjust column widths interactively. Individual jobs can
+be selected with \texttt{Space} and multiple selected jobs can be
+cancelled in bulk with a single keypress, removing the need to
+copy-paste job IDs into \texttt{scancel}.
+
+\begin{figure}
+\centering
+\includegraphics{viewjobs.png}
+\caption{Interactive TUI of \texttt{viewjobs}, showing job navigation,
+multi-column display, and bulk-cancel workflow. The image is AI
+generated from a real screenshot (Google NanoBanana)
+\label{fig:viewjobs}}
+\end{figure}
+
+Energy consumption in research computing is a growing concern
+(\citeproc{ref-lannelongue2021green}{Lannelongue et al., 2021}). Most
+researchers have no practical mechanism to shift flexible jobs to
+periods when grid electricity is cheaper or cleaner. NBI-Slurm addresses
+this directly with a configurable scheduling module that calculates the
+next available low-energy window and injects a \texttt{-\/-begin}
+directive into the submission, requiring no change to the underlying
+command.
+
+\section{Availability and
+Installation}\label{availability-and-installation}
+
+NBI-Slurm is distributed under the MIT licence and is available from
+CPAN as \texttt{NBI::Slurm}. Installation requires Perl 5.16 or later
+and can be performed with:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ExtensionTok{cpanm}\NormalTok{ NBI::Slurm}
+\end{Highlighting}
+\end{Shaded}
+
+The source code is hosted at
+\url{https://github.com/quadram-institute-bioscience/NBI-Slurm} under
+continuous integration. Development has been active since June 2023, and
+the module is published to the MetaCPAN repository at
+\url{https://metacpan.org/dist/NBI-Slurm}.
+
+\section{Code Structure and
+Dependencies}\label{code-structure-and-dependencies}
+
+The package is organised into two layers.
+
+\textbf{Perl module library (\texttt{lib/NBI/}):} Five classes model the
+key abstractions:
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{NBI::Opts} --- encapsulates SLURM resource directives (queue,
+  threads, memory, wall-time, email, job arrays, start time). It accepts
+  human-friendly inputs such as \texttt{"8GB"} or \texttt{"2h30m"} and
+  converts them to SLURM's expected formats.
+\item
+  \texttt{NBI::Job} --- represents a job to be submitted, holding a
+  command (or list of commands) and an \texttt{NBI::Opts} object. The
+  \texttt{script()} method generates a complete \texttt{sbatch} script;
+  \texttt{run()} submits it and returns the job identifier.
+\item
+  \texttt{NBI::Queue} --- queries the live SLURM queue via
+  \texttt{squeue} and returns a list of \texttt{NBI::QueuedJob} objects,
+  optionally filtered by user, status, name, or queue.
+\item
+  \texttt{NBI::QueuedJob} --- a lightweight data object representing one
+  queued job, used by the queue-management tools.
+\item
+  \texttt{NBI::EcoScheduler} --- implements the energy-aware scheduling
+  logic. Given a job's expected duration and a set of configurable
+  windows, it finds the next period satisfying a three-tier preference:
+  (1) job completes within an eco window and avoids peak hours; (2) job
+  starts in an eco window and avoids peak hours but may overrun; (3) job
+  starts in an eco window and partially overlaps peak hours. Default
+  windows target weekday nights (00:00--06:00) and weekend off-peak
+  periods (00:00--07:00, 11:00--16:00), avoiding evening peaks
+  (17:00--20:00), all of which are fully configurable with a settings
+  file (by default \texttt{\textasciitilde{}/.nbislurm.config}).
+\end{itemize}
+
+\textbf{Command-line tools (\texttt{bin/}):}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 2\tabcolsep) * \real{0.4000}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 2\tabcolsep) * \real{0.6000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Tool
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Purpose
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{runjob} & Submit a command as a SLURM job with resource flags \\
+\texttt{lsjobs} & List, filter, and cancel user jobs with coloured
+tabular output \\
+\texttt{viewjobs} & Interactive terminal UI for job management \\
+\texttt{waitjobs} & Block until jobs matching a pattern complete \\
+\texttt{whojobs} & Show cluster utilisation grouped by user \\
+\texttt{session} & Launch an interactive SLURM session \\
+\end{longtable}
+
+Runtime dependencies are deliberately minimal: \texttt{Capture::Tiny}
+(\textgreater=0.40), \texttt{JSON::PP}, \texttt{Text::ASCIITable}
+(\textgreater=0.22), \texttt{Term::ANSIColor}, \texttt{Storable}, and
+\texttt{POSIX}---all either part of the Perl core or widely available on
+CPAN.
+
+\section{Documentation}\label{documentation}
+
+Each module is documented with embedded POD (Plain Old Documentation),
+rendered on CPAN at \url{https://metacpan.org/dist/NBI-Slurm}. Each
+command-line tool provides a \texttt{-\/-help} flag and a manual page
+generated from its POD. A user guide with annotated examples is
+maintained in the repository's \texttt{README.md}. The test suite
+(\texttt{t/}) covers unit behaviour of every module and integration
+behaviour of the command-line tools; author-facing tests (\texttt{xt/})
+verify POD completeness and coverage. All tests will be able to check
+functions even without Slurm. To check the ability to interact with
+Slurm, there are optional tests that can be executed with
+\texttt{prove\ -lv\ xt/hpc-*.t}.
+
+\section{Example Applications}\label{example-applications}
+
+\textbf{Submitting a parallel job.} A researcher wishing to run a genome
+assembler with 18 cores, 64 GB RAM, and a 12-hour wall-time can write:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ExtensionTok{runjob} \AttributeTok{{-}n} \StringTok{"assembly"} \AttributeTok{{-}c}\NormalTok{ 18 }\AttributeTok{{-}m}\NormalTok{ 64 }\AttributeTok{{-}t}\NormalTok{ 12 }\AttributeTok{{-}w}\NormalTok{ ./logs/ }\DataTypeTok{\textbackslash{}}
+  \StringTok{"flye {-}{-}nano{-}raw reads.fastq {-}{-}out{-}dir asm"}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{Processing a file list as a job array.} To align 200 FASTQ
+files, one job per file:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ExtensionTok{runjob} \AttributeTok{{-}n} \StringTok{"align"} \AttributeTok{{-}c}\NormalTok{ 8 }\AttributeTok{{-}m}\NormalTok{ 16 }\AttributeTok{{-}{-}files}\NormalTok{ samples.txt }\DataTypeTok{\textbackslash{}}
+  \StringTok{"bwa mem ref.fa \#FILE\# \textgreater{} \#FILE\#.bam"}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{Energy-aware deferral.} A long-running but flexible annotation
+job can be scheduled for the next eco window automatically. Note that by
+default the \emph{eco mode} is enabled, and can be overridden with
+\texttt{-\/-no-eco} or setting the economy\_mode=0 in the configuration
+file.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ExtensionTok{runjob} \AttributeTok{{-}{-}eco} \AttributeTok{{-}n} \StringTok{"annotate"} \AttributeTok{{-}t}\NormalTok{ 6 }\StringTok{"prokka genome.fa"}
+\end{Highlighting}
+\end{Shaded}
+
+NBI-Slurm calculates the next suitable window (e.g., the following
+night) and adds \texttt{-\/-begin=2026-03-19T00:00:00} to the submission
+without any further user action.
+
+\textbf{Programmatic job chaining.} In a Perl analysis script:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{use} \FunctionTok{NBI::Job}\NormalTok{;}
+\FunctionTok{use} \FunctionTok{NBI::Opts}\NormalTok{;}
+
+\KeywordTok{my} \DataTypeTok{$opts}\NormalTok{ = }\FunctionTok{NBI::Opts}\NormalTok{{-}\textgreater{}new(}
+\NormalTok{    {-}queue =\textgreater{} }\OtherTok{"}\StringTok{long}\OtherTok{"}\NormalTok{, }
+\NormalTok{    {-}threads =\textgreater{} }\DecValTok{16}\NormalTok{, }
+\NormalTok{    {-}memory =\textgreater{} }\DecValTok{32}\NormalTok{, }
+\NormalTok{    {-}}\FunctionTok{time}\NormalTok{ =\textgreater{} }\OtherTok{"}\StringTok{4h}\OtherTok{"}\NormalTok{);}
+\KeywordTok{my} \DataTypeTok{$job}\NormalTok{  = }\FunctionTok{NBI::Job}\NormalTok{{-}\textgreater{}new(}
+\NormalTok{    {-}name =\textgreater{} }\OtherTok{"}\StringTok{step1}\OtherTok{"}\NormalTok{, }
+\NormalTok{    {-}command =\textgreater{} }\OtherTok{"}\StringTok{python align.py}\OtherTok{"}\NormalTok{, }
+\NormalTok{    {-}opts =\textgreater{} }\DataTypeTok{$opts}\NormalTok{);}
+\KeywordTok{my} \DataTypeTok{$id}\NormalTok{   = }\DataTypeTok{$job}\NormalTok{{-}\textgreater{}}\DataTypeTok{run}\NormalTok{();}
+
+\KeywordTok{my} \DataTypeTok{$opts2}\NormalTok{ = }\FunctionTok{NBI::Opts}\NormalTok{{-}\textgreater{}new(}
+\NormalTok{    {-}queue =\textgreater{} }\OtherTok{"}\StringTok{short}\OtherTok{"}\NormalTok{, }
+\NormalTok{    {-}threads =\textgreater{} }\DecValTok{4}\NormalTok{, }
+\NormalTok{    {-}memory =\textgreater{} }\DecValTok{8}\NormalTok{, }
+\NormalTok{    {-}}\FunctionTok{time}\NormalTok{ =\textgreater{} }\OtherTok{"}\StringTok{1h}\OtherTok{"}\NormalTok{);}
+\KeywordTok{my} \DataTypeTok{$job2}\NormalTok{  = }\FunctionTok{NBI::Job}\NormalTok{{-}\textgreater{}new(}
+\NormalTok{    {-}name =\textgreater{} }\OtherTok{"}\StringTok{step2}\OtherTok{"}\NormalTok{, }
+\NormalTok{    {-}command =\textgreater{} }\OtherTok{"}\StringTok{python report.py {-}{-}input results/}\OtherTok{"}\NormalTok{, }
+\NormalTok{    {-}opts =\textgreater{} }\DataTypeTok{$opts2}\NormalTok{);}
+\DataTypeTok{$job2}\NormalTok{{-}\textgreater{}}\DataTypeTok{opts}\NormalTok{{-}\textgreater{}}\DataTypeTok{dependencies}\NormalTok{([}\DataTypeTok{$id}\NormalTok{]);}
+\DataTypeTok{$job2}\NormalTok{{-}\textgreater{}}\DataTypeTok{run}\NormalTok{();}
+\end{Highlighting}
+\end{Shaded}
+
+\section{Acknowledgements}\label{acknowledgements}
+
+The author gratefully acknowledges the support of the Biotechnology and
+Biological Sciences Research Council (BBSRC); this research was funded
+by the BBSRC Institute Strategic Programme Food Microbiome and Health
+BB/X011054/1 and its constituent project(s) BBS/E/QU/230001B; the BBSRC
+Institute Strategic Programme Microbes and Food Safety BB/X011011/1 and
+its constituent project(s) BBS/E/QU/230002C; the BBSRC Core Capability
+Grant BB/CCG2260/1. This research was also supported by the
+infrastructure provided by the CLIMB-BIG-DATA grant MR/T030062/1. The
+author thanks colleagues at the Quadram Institute Bioscience for
+feedback and field-testing during development, and the GreenDISC working
+group and NBI Research Computing for support and discussions.
+
+\section{AI Usage Disclosure}\label{ai-usage-disclosure}
+
+Claude Code (Anthropic) was used during development of NBI-Slurm from
+version 0.10.0 onwards, assisting with code generation, refactoring,
+test scaffolding, and documentation drafting. It was also used to assist
+with drafting and editing this paper. All AI-assisted outputs were
+reviewed, edited, and validated by the author, who made all core design
+decisions and retains full responsibility for the accuracy, originality,
+and correctness of the submitted materials.
+
+\section*{References}\label{references}
+\addcontentsline{toc}{section}{References}
+
+\phantomsection\label{refs}
+\begin{CSLReferences}{1}{0}
+\bibitem[\citeproctext]{ref-di2017nextflow}
+Di Tommaso, P., Chatzou, M., Floden, E. W., Barja, P. P., Palumbo, E.,
+\& Notredame, C. (2017). Nextflow enables reproducible computational
+workflows. \emph{Nature Biotechnology}, \emph{35}(4), 316--319.
+\url{https://doi.org/10.1038/nbt.3820}
+
+\bibitem[\citeproctext]{ref-lannelongue2021green}
+Lannelongue, L., Grealey, J., \& Inouye, M. (2021). Green algorithms:
+Quantifying the carbon footprint of computation. \emph{Advanced
+Science}, \emph{8}(12). \url{https://doi.org/10.1002/advs.202100707}
+
+\bibitem[\citeproctext]{ref-molder2021snakemake}
+Mölder, F., Jablonski, K. P., Letcher, B., Hall, M. B., Tomkins-Tinch,
+C. H., Sochat, V., Forster, J., Lee, S., Twardziok, S. O., Kanitz, A.,
+Wilm, A., Holtgrewe, M., Rahmann, S., Nahnsen, S., \& Köster, J. (2021).
+Sustainable data analysis with snakemake. \emph{F1000Research},
+\emph{10}, 33. \url{https://doi.org/10.12688/f1000research.29032.2}
+
+\bibitem[\citeproctext]{ref-slurm_adoption}
+Wang, B., Chen, Z., \& Xiao, N. (2020). A survey of system scheduling
+for HPC and big data. \emph{Proceedings of the 2020 4th International
+Conference on High Performance Compilation, Computing and
+Communications}, 178--183. \url{https://doi.org/10.1145/3407947.3407977}
+
+\bibitem[\citeproctext]{ref-jette2002slurm}
+Yoo, A. B., Jette, M. A., \& Grondona, M. (2003). SLURM: Simple linux
+utility for resource management. \emph{Job Scheduling Strategies for
+Parallel Processing}, 44--60. \url{https://doi.org/10.1007/10968987_3}
+
+\end{CSLReferences}
+
+\end{document}

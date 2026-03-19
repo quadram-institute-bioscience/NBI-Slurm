@@ -7,3 +7,6 @@ catalogue.cache
 file.pl
 .vscode.smbdelete*
 .smbdelete*
+paper.pdf
+.DS_Store
+paper.html
