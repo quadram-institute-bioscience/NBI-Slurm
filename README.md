@@ -196,6 +196,9 @@ my $jobid = $job->run;
 
 For more detailed information on the available methods and options, please refer to the individual documentation of the NBI::Job and NBI::Opts classes.
 
+Automatic tests check the functionality of the classes and methods even when Slurm is not available. From the cluster where NBI::Slurm
+will be used, it's possible to run `prove -lv xt/hpc-*.t` to test the ability to submit jobs (but some tests might fail for busy partitions, drain, etc).
+
 ## Author
 
 [NBI::Slurm](https://metacpan.org/dist/NBI-Slurm) is written by [Andrea Telatin](https://telatin.github.io)
