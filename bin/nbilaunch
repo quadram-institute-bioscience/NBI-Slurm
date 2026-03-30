@@ -44,6 +44,7 @@ my $CONFIG_MEMORY  = do {
     int($mb / 1024) || 8;
 };
 my $CONFIG_RUNTIME = $config->{time}    // '02:00:00';
+my $CONFIG_SCRATCH = $config->{scratch} // undef;
 
 # ── Pre-parse: detect --list / --version before loading any launcher ──────────
 if (@ARGV == 0 || grep { /^--?(h(elp)?|\?)$/ && !@ARGV[0..0] } @ARGV) {
@@ -91,7 +92,7 @@ if (grep { /^--?help$/ } @ARGV) {
 # ── First pass: strip global nbilaunch flags ──────────────────────────────────
 my ($opt_run, $opt_dry_run, $opt_verbose,
     $opt_sample_name, $opt_job_name,
-    $opt_queue, $opt_mem, $opt_cpus, $opt_runtime);
+    $opt_queue, $opt_mem, $opt_cpus, $opt_runtime, $opt_scratch_dir);
 
 Getopt::Long::GetOptions(
     'run'           => \$opt_run,
@@ -103,6 +104,7 @@ Getopt::Long::GetOptions(
     'mem=i'         => \$opt_mem,
     'cpus=i'        => \$opt_cpus,
     'runtime=s'     => \$opt_runtime,
+    'scratch-dir=s' => \$opt_scratch_dir,
 ) or die "ERROR: bad global options. Run 'nbilaunch $toolname --help' for usage.\n";
 
 # Dry-run is the default; --run must be explicit
@@ -115,9 +117,18 @@ my %tool_args = _parse_tool_args($launcher, @ARGV);
 # Priority (highest → lowest): CLI flag → ~/.nbislurm.config → launcher default
 $tool_args{sample_name}   = $opt_sample_name                    if defined $opt_sample_name;
 $tool_args{slurm_queue}   = $opt_queue   // $CONFIG_QUEUE;
-$tool_args{slurm_memory}  = $opt_mem     // $CONFIG_MEMORY;
+$tool_args{slurm_memory}  = $opt_mem                           if defined $opt_mem;
 $tool_args{slurm_threads} = $opt_cpus    // $CONFIG_THREADS;
 $tool_args{slurm_runtime} = $opt_runtime // $CONFIG_RUNTIME;
+my $scratch_dir = $opt_scratch_dir // $CONFIG_SCRATCH;
+$tool_args{scratch_dir}   = $scratch_dir                       if defined $scratch_dir;
+
+# Resolve wildcard queues (e.g. "qib-*") the same way runjob does:
+# replace * with short/medium/long based on walltime.
+$tool_args{slurm_queue} = _resolve_queue(
+    $tool_args{slurm_queue},
+    $tool_args{slurm_runtime} // $launcher->{slurm_defaults}{runtime},
+);
 
 # ── Build job and manifest ────────────────────────────────────────────────────
 my ($result, $manifest) = $launcher->build(%tool_args);
@@ -126,15 +137,16 @@ my ($result, $manifest) = $launcher->build(%tool_args);
 my $is_pipeline = ref($result) eq 'NBI::Pipeline';
 
 # Derive sample name and outdir from manifest for display
-my $sample = $manifest->{sample};
-my $outdir = $manifest->{outdir};
-my $nbi_dir = "$outdir/.nbilaunch";
+my $sample   = $manifest->{sample};
+my $outdir   = $manifest->{outdir};
+my $nbi_dir  = "$outdir/.nbilaunch";
+my $job_name = $manifest->{tool} . '_' . $sample;
 
 # ── Write provenance files ────────────────────────────────────────────────────
 make_path($nbi_dir) unless -d $nbi_dir;
 
 my $manifest_path = "$nbi_dir/$sample.manifest.json";
-my $script_path   = "$nbi_dir/$sample.script.sh";
+my $script_path   = "$nbi_dir/${job_name}.script.sh";
 
 # Retrieve the script content from the job object
 my $script_content;
@@ -196,7 +208,7 @@ say "[nbilaunch] Submitted $toolname/$sample";
 say "[nbilaunch] Job ID:    " . join(', ', @job_ids);
 say "[nbilaunch] Manifest:  $manifest_path";
 say "[nbilaunch] Script:    $script_path";
-say "[nbilaunch] Log:       $nbi_dir/$sample.log";
+say "[nbilaunch] Log:       $nbi_dir/${job_name}.<jobid>.log";
 
 exit 0;
 
@@ -240,21 +252,23 @@ sub _discover_launcher {
     # 4. Fallback: scan all paths and match by the launcher's declared name.
     # This handles cases like "removeprimers" finding NBI::Launcher::RemovePrimers
     # whose declared name is "remove-primers" — both normalise to "removeprimers".
+    # Use the file basename directly as package suffix (preserves CamelCase).
     my $name_norm = lc($name) =~ s/-//gr;
     for my $dir ('./launchers', "$ENV{HOME}/.nbi/launchers",
                  map { "$_/NBI/Launcher" } @INC) {
         next unless -d $dir;
         for my $file (glob("$dir/*.pm")) {
+            my $found_mod;
             eval {
+                no warnings 'redefine';
                 require $file;
-                my $pkg = 'NBI::Launcher::' . _canonicalise_name(basename($file, '.pm'));
+                my $pkg = 'NBI::Launcher::' . basename($file, '.pm');
                 my $obj = $pkg->new();
                 if ((lc($obj->{name}) =~ s/-//gr) eq $name_norm) {
-                    $mod = _canonicalise_name(basename($file, '.pm'));
-                    die "FOUND\n";   # non-error exit from eval
+                    $found_mod = basename($file, '.pm');
                 }
             };
-            return "NBI::Launcher::${mod}" if $@ eq "FOUND\n";
+            return "NBI::Launcher::${found_mod}" if defined $found_mod;
         }
     }
 
@@ -290,8 +304,9 @@ sub _list_launchers {
             # Load to get the declared tool name (e.g. "remove-primers" from RemovePrimers.pm)
             my ($declared_name, $desc, $ver, $obj) = (lc($basename), '', '', undef);
             eval {
+                no warnings 'redefine';
                 require $file;
-                my $pkg = 'NBI::Launcher::' . _canonicalise_name($basename);
+                my $pkg = 'NBI::Launcher::' . $basename;
                 $obj  = $pkg->new();
                 $declared_name = $obj->{name}        // lc($basename);
                 $desc          = $obj->{description} // '';
@@ -418,10 +433,11 @@ sub _print_tool_help {
     }
 
     say "SLURM OPTIONS";
-    printf "  --%-14s %s\n", "queue STR",   "[default: $sd->{queue}]";
-    printf "  --%-14s %s\n", "mem INT",     "Memory in GB  [default: $sd->{memory}]";
-    printf "  --%-14s %s\n", "cpus INT",    "CPUs  [default: $sd->{threads}]";
-    printf "  --%-14s %s\n", "runtime STR", "Walltime HH:MM:SS  [default: $sd->{runtime}]";
+    printf "  --%-14s %s\n", "queue STR",      "[default: $sd->{queue}]";
+    printf "  --%-14s %s\n", "mem INT",        "Memory in GB  [default: $sd->{memory}]";
+    printf "  --%-14s %s\n", "cpus INT",       "CPUs  [default: $sd->{threads}]";
+    printf "  --%-14s %s\n", "runtime STR",    "Walltime HH:MM:SS  [default: $sd->{runtime}]";
+    printf "  --%-14s %s\n", "scratch-dir DIR","Base dir for per-job scratch (overrides config scratch=)";
     say "";
 
     # Note slurm_sync params if present
@@ -443,6 +459,58 @@ sub _print_tool_help {
 }
 
 # ── _usage() ─────────────────────────────────────────────────────────────────
+# ── _resolve_queue($queue, $runtime) ─────────────────────────────────────────
+# General queue resolution:
+#
+#   "qib-short"              plain name → pass through unchanged
+#   "qib-compute,qib-service" comma list → pass through (sbatch picks first free)
+#   "qib-*"                  wildcard   → expand against sinfo, pick by logic:
+#       - If matches include short/medium/long variants → pick tier by walltime
+#       - Otherwise → return first available match (comma-joined if multiple)
+#
+# Falls back to simple string substitution when sinfo is unavailable.
+sub _resolve_queue {
+    my ($queue, $runtime) = @_;
+
+    # Comma list or plain name: pass through as-is
+    return $queue unless defined $queue && $queue =~ /\*/;
+
+    # ── Wildcard: query sinfo for actual available queues ─────────────────────
+    my @available = eval { NBI::Slurm::queues('CAN FAIL') };
+    @available = map { s/\*$//r } @available;   # strip sinfo's default-queue marker
+
+    # Build regex from wildcard (e.g. "qib-*" → /^qib-(.+)$/)
+    my $regex = do { (my $r = quotemeta $queue) =~ s/\\\*/(.+)/; qr/^$r$/ };
+    my @matches = grep { $_ =~ $regex } @available;
+
+    # No sinfo results (offline/dev): fall back to simple substitution
+    unless (@matches) {
+        my $hours = NBI::Launcher::_runtime_to_hours($runtime // '01:00:00');
+        my $tier  = $hours <= 2  ? 'short'
+                  : $hours <= 48 ? 'medium'
+                  :                'long';
+        (my $resolved = $queue) =~ s/\*/$tier/g;
+        return $resolved;
+    }
+
+    # Check if matches contain tier-named queues (short / medium / long)
+    my %tier_map = map { /-(short|medium|long)$/i ? (lc($1) => $_) : () } @matches;
+
+    if (%tier_map) {
+        # Pick the appropriate tier, walking up if the exact tier is absent
+        my $hours = NBI::Launcher::_runtime_to_hours($runtime // '01:00:00');
+        my @preference = $hours <= 2  ? qw(short medium long)
+                       : $hours <= 48 ? qw(medium long short)
+                       :                qw(long medium short);
+        for my $t (@preference) {
+            return $tier_map{$t} if exists $tier_map{$t};
+        }
+    }
+
+    # No tier names: return all matches comma-joined (sbatch picks first free)
+    return join(',', @matches);
+}
+
 sub _usage {
     say "nbilaunch $VERSION — Universal HPC launcher dispatcher";
     say "";
@@ -461,6 +529,7 @@ sub _usage {
     say "  --mem INT          Override memory in GB";
     say "  --cpus INT         Override CPU count";
     say "  --runtime STR      Override walltime (HH:MM:SS)";
+    say "  --scratch-dir DIR  Base directory for per-job scratch (overrides config scratch=)";
     say "  --list             List all discovered launchers";
     say "  --version          Show nbilaunch version";
 }

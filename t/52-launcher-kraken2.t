@@ -13,7 +13,7 @@ my $k = NBI::Launcher::Kraken2->new();
 isa_ok($k, 'NBI::Launcher',         'Kraken2 isa NBI::Launcher');
 isa_ok($k, 'NBI::Launcher::Kraken2','Kraken2 isa NBI::Launcher::Kraken2');
 is($k->{name},    'kraken2', 'name is kraken2');
-is($k->{version}, '2.1.0',   'version is 2.1.0');
+is($k->{version}, '2.0.8',   'version is 2.0.8');
 
 # ── make_command() — paired-end ───────────────────────────────────────────────
 my $cmd_pe = $k->make_command(
@@ -26,10 +26,10 @@ my $cmd_pe = $k->make_command(
 );
 like($cmd_pe, qr/kraken2/,                  'paired cmd starts with kraken2');
 like($cmd_pe, qr/--paired/,                 'paired cmd has --paired');
-like($cmd_pe, qr/-1 \/data\/s_R1\.fq\.gz/, 'paired cmd has -1 with r1');
-like($cmd_pe, qr/-2 \/data\/s_R2\.fq\.gz/, 'paired cmd has -2 with r2');
+like($cmd_pe, qr/-1 "?\/data\/s_R1\.fq\.gz"?/, 'paired cmd has -1 with r1');
+like($cmd_pe, qr/-2 "?\/data\/s_R2\.fq\.gz"?/, 'paired cmd has -2 with r2');
 like($cmd_pe, qr/--threads 8/,              'paired cmd has threads');
-like($cmd_pe, qr/--db \/db\/kraken2/,       'paired cmd has db');
+like($cmd_pe, qr/--db "?\/db\/kraken2"?/,   'paired cmd has db');
 like($cmd_pe, qr/--confidence 0/,           'paired cmd has confidence');
 like($cmd_pe, qr/\$SCRATCH\/sample1\.k2report/, 'output uses $SCRATCH');
 
@@ -94,7 +94,7 @@ isa_ok($manifest, 'NBI::Manifest', 'build() returns NBI::Manifest');
 my $script = $job->script();
 like($script, qr/#SBATCH -p test/,  'script has correct queue');
 like($script, qr/#SBATCH -c 4/,     'script has correct cpus');
-like($script, qr/module load kraken2\/2\.1\.0/, 'script has module activation');
+like($script, qr/module load kraken2\/2\.0\.8/, 'script has module activation');
 like($script, qr/SCRATCH=\$\(mktemp/, 'script sets up scratch');
 
 # slurm_sync: threads in make_command comes from slurm_threads

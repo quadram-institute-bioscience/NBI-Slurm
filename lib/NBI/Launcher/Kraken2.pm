@@ -15,6 +15,7 @@ package NBI::Launcher::Kraken2;
 use strict;
 use warnings;
 use parent 'NBI::Launcher';
+use POSIX qw(ceil);
 
 sub new {
     my ($class) = @_;
@@ -22,19 +23,22 @@ sub new {
 
         name        => 'kraken2',
         description => 'Taxonomic classification of sequencing reads',
-        version     => '2.1.0',
+        version     => '2.0.8',
 
         # ── Activation ───────────────────────────────────────────────────────
         # Using HPC module here.  To switch to singularity, replace with:
         #   activate => { singularity => '/path/to/kraken2.sif' },
-        activate => { module => 'kraken2/2.1.0' },
+        activate => { module => 'kraken2/2.0.8' },
 
         # ── Slurm defaults ───────────────────────────────────────────────────
+        # Memory is auto-calculated from the database folder size at submit time
+        # (ceil(db_size_gb * 1.4) + 100 GB overhead).  The value here is used only when the
+        # db path is unavailable at submission (e.g. dry-run without a real db).
         slurm_defaults => {
             queue   => 'qib-short',
             threads => 8,
-            memory  => 32,        # GB
-            runtime => '04:00:00',
+            memory  => 64,        # GB fallback — overridden by db-size calc
+            runtime => '24:00:00',
         },
 
         # ── Inputs ───────────────────────────────────────────────────────────
@@ -113,18 +117,59 @@ sub make_command {
     my ($self, %args) = @_;
 
     my $pe = defined $args{r2}
-        ? "--paired -1 $args{r1} -2 $args{r2}"
-        : $args{r1};
+        ? "--paired -1 \"$args{r1}\" -2 \"$args{r2}\""
+        : "\"$args{r1}\"";
 
     return join(" \\\n    ",
         'kraken2',
         "--threads $args{threads}",
-        "--db $args{db}",
+        "--db \"$args{db}\"",
         "--confidence $args{confidence}",
-        '--report $SCRATCH/' . "$args{sample}.k2report",
-        '--output $SCRATCH/' . "$args{sample}.k2out",
+        '--report "$SCRATCH/' . "$args{sample}.k2report\"",
+        '--output "$SCRATCH/' . "$args{sample}.k2out\"",
         $pe,
     );
+}
+
+# ── build(%args) ─────────────────────────────────────────────────────────────
+# Override to auto-calculate memory from the Kraken2 database folder size
+# before handing off to the base class.  Only applies when --mem is not
+# explicitly set on the command line (slurm_memory not in %args).
+sub build {
+    my ($self, %args) = @_;
+
+    unless (defined $args{slurm_memory}) {
+        # Resolve the db path the same way validate() does: arg → env → default
+        my $db = $args{db}
+              // $ENV{KRAKEN2_DB}
+              // $self->{slurm_defaults}{db}
+              // '/qib/databases/kraken2/standard';
+
+        if (-d $db) {
+            my $size_gb = _folder_size_gb($db);
+            if ($size_gb > 0) {
+                # 40% contingency + 100 GB fixed overhead, rounded up
+                $args{slurm_memory} = ceil($size_gb * 1.4) + 100;
+                warn "[nbilaunch] kraken2: db is ${size_gb}GB, "
+                   . "requesting $args{slurm_memory}GB RAM\n";
+            }
+        }
+    }
+
+    return $self->SUPER::build(%args);
+}
+
+# ── _folder_size_gb($dir) ─────────────────────────────────────────────────────
+# Returns the total disk usage of $dir in GB using 'du -sk'.
+# Returns 0 if du fails or the path is inaccessible.
+sub _folder_size_gb {
+    my ($dir) = @_;
+    # du -sk: POSIX-portable, output in kilobytes
+    # Use single-quoted shell string to avoid backslash issues; escape only ' in path
+    (my $safe = $dir) =~ s/'/'"'"'/g;
+    my $out = `du -sk '$safe' 2>/dev/null`;
+    return 0 unless defined $out && $out =~ /^(\d+)/;
+    return $1 / (1024 * 1024);   # KB → GB
 }
 
 1;

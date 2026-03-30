@@ -303,10 +303,12 @@ fi
     my $activation = $self->activation_lines();
 
     # ── Scratch setup ─────────────────────────────────────────────────────────
+    # Priority: explicit scratch_dir arg > $TMPDIR (use_tmpdir) > /tmp
     my $use_tmpdir = $self->{scratch}{use_tmpdir} // 0;
-    my $scratch_init = $use_tmpdir
-        ? qq{SCRATCH=\$(mktemp -d "\${TMPDIR:-/tmp}/${tool}_XXXXXXXX")}
-        : qq{SCRATCH=\$(mktemp -d "/tmp/${tool}_XXXXXXXX")};
+    my $scratch_base = defined $args{scratch_dir} ? $args{scratch_dir}
+                     : $use_tmpdir                ? '${TMPDIR:-/tmp}'
+                     :                              '/tmp';
+    my $scratch_init = qq{SCRATCH=\$(mktemp -d "$scratch_base/${tool}_XXXXXXXX")};
 
     # ── Assemble script ───────────────────────────────────────────────────────
     my $sep = '# ' . '─' x 74;
@@ -323,10 +325,16 @@ $sep
 $sep
 
 $sep
+# Runtime variables — defined first so traps and manifest can reference them
+SAMPLE="$sample"
+OUTDIR="\$(realpath "$outdir" 2>/dev/null || echo "$outdir")"
+$scratch_init
+MANIFEST="\$OUTDIR/.nbilaunch/$sample.manifest.json"
+$sep
+
+$sep
 # Manifest update — called by ERR trap (failure) and at end (success).
 # Uses a perl one-liner so there is no jq dependency on the HPC.
-MANIFEST="\$OUTDIR/.nbilaunch/$sample.manifest.json"
-
 _nbi_manifest_update() {
     local status="\$1" exit_code="\$2" completed_at
     completed_at=\$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -338,6 +346,11 @@ _nbi_manifest_update() {
 }
 
 trap '_nbi_manifest_update failure \$?' ERR
+$sep
+
+$sep
+# Scratch cleanup on exit (runs even on success — scratch is empty after mv)
+trap 'rm -rf "\$SCRATCH"' EXIT
 $sep
 
 SCRIPT
@@ -353,17 +366,6 @@ SCRIPT
     }
 
     $script .= <<"SCRIPT";
-$sep
-# Runtime variables
-SAMPLE="$sample"
-OUTDIR="\$(realpath "$outdir" 2>/dev/null || echo "$outdir")"
-$scratch_init
-$sep
-
-$sep
-# Scratch cleanup on exit (runs even on success — scratch is empty after mv)
-trap 'rm -rf "\$SCRATCH"' EXIT
-$sep
 
 $sep
 # Tool command
@@ -411,11 +413,11 @@ sub _resolve_args {
         }
     }
 
-    # Resolve absolute paths for file/dir inputs
-    for my $inp (@{ $self->{inputs} }) {
-        my $name = $inp->{name};
+    # Resolve absolute paths for file/dir inputs and params
+    for my $spec (@{ $self->{inputs} }, @{ $self->{params} }) {
+        my $name = $spec->{name};
         next unless defined $args{$name};
-        my $type = $inp->{type} // '';
+        my $type = $spec->{type} // '';
         if ($type eq 'file' || $type eq 'dir') {
             $args{$name} = realpath($args{$name}) // $args{$name};
         }
@@ -505,8 +507,9 @@ sub build {
     # ── Paths ─────────────────────────────────────────────────────────────────
     my $outdir        = $args{outdir};
     my $nbi_dir       = "$outdir/.nbilaunch";
+    my $job_name      = "$self->{name}_$sample";
     my $manifest_path = "$nbi_dir/$sample.manifest.json";
-    my $script_rel    = ".nbilaunch/$sample.script.sh";
+    my $script_rel    = ".nbilaunch/${job_name}.script.sh";
 
     $args{manifest_path} = $manifest_path;
 
@@ -526,16 +529,15 @@ sub build {
     );
 
     # ── Build NBI::Job ────────────────────────────────────────────────────────
-    my $job_name = "$self->{name}_$sample";
     my $job = NBI::Job->new(
         -name    => $job_name,
         -command => $script_body,
         -opts    => $opts,
     );
 
-    # Log goes to provenance directory
-    $job->outputfile = "$nbi_dir/$sample.log";
-    $job->errorfile  = "$nbi_dir/$sample.err";
+    # Log/err go to provenance directory; %j is expanded by Slurm to the job ID
+    $job->outputfile = "$nbi_dir/${job_name}.%j.log";
+    $job->errorfile  = "$nbi_dir/${job_name}.%j.err";
 
     # ── Collect resolved inputs/params/outputs for manifest ───────────────────
     my %inp_snapshot;
