@@ -8,7 +8,7 @@ tags:
   - bioinformatics
 authors:
   - name: Andrea Telatin
-    affiliation: 1,2
+    affiliation: "1, 2"
     orcid: 0000-0001-7619-281X
 affiliations:
   - name: Quadram Institute Bioscience, Norwich, NR4 7UQ, UK
