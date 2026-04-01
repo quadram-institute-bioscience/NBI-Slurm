@@ -10,7 +10,7 @@ package NBI::Pipeline;
 #   submission.
 #
 #   This is intentionally minimal in v1.  It does not resolve filenames between
-#   jobs — complex launchers handle that via NBI::Manifest->load().
+#   jobs - complex launchers handle that via NBI::Manifest->load().
 #
 # USAGE IN A LAUNCHER:
 #   sub build {
@@ -111,7 +111,7 @@ __END__
 
 =head1 NAME
 
-NBI::Pipeline — Ordered list of NBI::Job objects with dependency wiring
+NBI::Pipeline - Ordered list of NBI::Job objects with dependency wiring
 
 =head1 SYNOPSIS
 

@@ -6,7 +6,7 @@ package NBI::Launcher;
 # DESCRIPTION:
 #   Every tool wrapper inherits from this class.  Subclasses provide:
 #     - A constructor that calls SUPER::new() with the launcher spec
-#     - make_command(%args) — the tool invocation string (only override needed
+#     - make_command(%args) - the tool invocation string (only override needed
 #       for most tools)
 #
 #   The base class provides everything else:
@@ -17,7 +17,7 @@ package NBI::Launcher;
 #
 # RELATIONSHIPS:
 #   - Subclasses live in NBI::Launcher::*, ./launchers/, or ~/.nbi/launchers/.
-#   - build() returns (NBI::Job, NBI::Manifest) — consumed by bin/nbilaunch.
+#   - build() returns (NBI::Job, NBI::Manifest) - consumed by bin/nbilaunch.
 #   - NBI::Pipeline wraps multiple NBI::Job objects for multi-step launchers.
 #
 
@@ -128,7 +128,7 @@ sub sample_name {
             last if defined $source;
         }
     }
-    confess "ERROR NBI::Launcher ($self->{name}): cannot derive sample name — no file input found\n"
+    confess "ERROR NBI::Launcher ($self->{name}): cannot derive sample name - no file input found\n"
         unless defined $source;
 
     my $name = basename($source);
@@ -186,9 +186,9 @@ sub validate {
 
         my $type = $inp->{type} // 'string';
         if ($type eq 'file' && !-f $val) {
-            confess "ERROR NBI::Launcher ($self->{name}): input '$name' — file not found: $val\n";
+            confess "ERROR NBI::Launcher ($self->{name}): input '$name' - file not found: $val\n";
         } elsif ($type eq 'dir' && !-d $val) {
-            confess "ERROR NBI::Launcher ($self->{name}): input '$name' — directory not found: $val\n";
+            confess "ERROR NBI::Launcher ($self->{name}): input '$name' - directory not found: $val\n";
         }
     }
 
@@ -215,9 +215,9 @@ sub validate {
         } elsif ($type eq 'float' && $val !~ /^[\d.]+$/) {
             confess "ERROR NBI::Launcher ($self->{name}): param '$name' must be a number, got: $val\n";
         } elsif ($type eq 'file' && !-f $val) {
-            confess "ERROR NBI::Launcher ($self->{name}): param '$name' — file not found: $val\n";
+            confess "ERROR NBI::Launcher ($self->{name}): param '$name' - file not found: $val\n";
         } elsif ($type eq 'dir' && !-d $val) {
-            confess "ERROR NBI::Launcher ($self->{name}): param '$name' — directory not found: $val\n";
+            confess "ERROR NBI::Launcher ($self->{name}): param '$name' - directory not found: $val\n";
         }
     }
 
@@ -232,11 +232,11 @@ sub validate {
 # ── make_command(%args) ───────────────────────────────────────────────────────
 # Returns the tool invocation string to embed in the job script.
 # Subclasses SHOULD override this method.
-# The default implementation raises an error — every launcher needs a command.
+# The default implementation raises an error - every launcher needs a command.
 #
 # %args contains all resolved inputs, params, and derived keys:
-#   $args{sample}    — derived sample name
-#   $args{threads}   — from slurm_sync or slurm_defaults
+#   $args{sample}    - derived sample name
+#   $args{threads}   - from slurm_sync or slurm_defaults
 #   For scratch paths, use literal \$SCRATCH (shell variable).
 sub make_command {
     my ($self, %args) = @_;
@@ -325,7 +325,7 @@ $sep
 $sep
 
 $sep
-# Runtime variables — defined first so traps and manifest can reference them
+# Runtime variables - defined first so traps and manifest can reference them
 SAMPLE="$sample"
 OUTDIR="\$(realpath "$outdir" 2>/dev/null || echo "$outdir")"
 $scratch_init
@@ -333,7 +333,7 @@ MANIFEST="\$OUTDIR/.nbilaunch/$sample.manifest.json"
 $sep
 
 $sep
-# Manifest update — called by ERR trap (failure) and at end (success).
+# Manifest update - called by ERR trap (failure) and at end (success).
 # Uses a perl one-liner so there is no jq dependency on the HPC.
 _nbi_manifest_update() {
     local status="\$1" exit_code="\$2" completed_at
@@ -349,7 +349,7 @@ trap '_nbi_manifest_update failure \$?' ERR
 $sep
 
 $sep
-# Scratch cleanup on exit (runs even on success — scratch is empty after mv)
+# Scratch cleanup on exit (runs even on success - scratch is empty after mv)
 trap 'rm -rf "\$SCRATCH"' EXIT
 $sep
 
@@ -467,12 +467,12 @@ sub _runtime_to_hours {
 #
 # %args keys:
 #   All inputs/params by name (from nbilaunch arg parsing)
-#   outdir         — output directory (required)
-#   sample_name    — optional override for derived sample name
-#   slurm_queue    — override slurm_defaults{queue}
-#   slurm_threads  — override slurm_defaults{threads}
-#   slurm_memory   — override slurm_defaults{memory} (GB)
-#   slurm_runtime  — override slurm_defaults{runtime} (HH:MM:SS or hours)
+#   outdir         - output directory (required)
+#   sample_name    - optional override for derived sample name
+#   slurm_queue    - override slurm_defaults{queue}
+#   slurm_threads  - override slurm_defaults{threads}
+#   slurm_memory   - override slurm_defaults{memory} (GB)
+#   slurm_runtime  - override slurm_defaults{runtime} (HH:MM:SS or hours)
 sub build {
     my ($self, %args) = @_;
 
@@ -586,7 +586,7 @@ __END__
 
 =head1 NAME
 
-NBI::Launcher — Base class for nbilaunch tool wrappers
+NBI::Launcher - Base class for nbilaunch tool wrappers
 
 =head1 SYNOPSIS
 
@@ -630,7 +630,7 @@ Shell snippet to load the tool (module load / source activate / empty for singul
 
 =head2 singularity_prefix()
 
-Returns C<"singularity exec $image "> or C<""> — use in make_command() overrides.
+Returns C<"singularity exec $image "> or C<""> - use in make_command() overrides.
 
 =head2 sample_name(%args)
 
@@ -660,7 +660,7 @@ Assembles the full bash script body.  Called by build().
 
 =head2 build(%args)
 
-Validates, resolves, and returns C<($job, $manifest)> — an C<NBI::Job>
-and an C<NBI::Manifest> — ready for nbilaunch to write and optionally submit.
+Validates, resolves, and returns C<($job, $manifest)> - an C<NBI::Job>
+and an C<NBI::Manifest> - ready for nbilaunch to write and optionally submit.
 
 =cut

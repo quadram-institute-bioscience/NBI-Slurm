@@ -422,7 +422,7 @@ sub _parse_start_date {
     # Also accepts the already-normalised YYYY-MM-DD form (idempotent).
     my $date = shift;
 
-    # Already normalised by a previous call — pass through unchanged.
+    # Already normalised by a previous call - pass through unchanged.
     return $date if $date =~ /^\d{4}-\d{2}-\d{2}$/;
 
     unless ($date =~ m{^(\d{1,2})/(\d{1,2})(?:/(\d{4}))?$}) {

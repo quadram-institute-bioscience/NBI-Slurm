@@ -143,7 +143,7 @@ sub output {
 # Used by nbilaunch after submission to record the Slurm job ID.
 sub update {
     my ($self, %changes) = @_;
-    confess "ERROR NBI::Manifest::update: no path known — call write() first\n"
+    confess "ERROR NBI::Manifest::update: no path known - call write() first\n"
         unless defined $self->{_path};
 
     for my $k (keys %changes) {
@@ -161,7 +161,7 @@ __END__
 
 =head1 NAME
 
-NBI::Manifest — Provenance record for a single nbilaunch job run
+NBI::Manifest - Provenance record for a single nbilaunch job run
 
 =head1 SYNOPSIS
 

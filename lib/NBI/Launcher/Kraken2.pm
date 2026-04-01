@@ -1,10 +1,10 @@
 package NBI::Launcher::Kraken2;
 
 # =============================================================================
-# NBI::Launcher::Kraken2  —  Taxonomic classification using Kraken2
+# NBI::Launcher::Kraken2  -  Taxonomic classification using Kraken2
 #
 # Reference implementation of the NBI::Launcher subclass pattern.
-# Only make_command() is overridden — the base class handles everything else.
+# Only make_command() is overridden - the base class handles everything else.
 #
 # Tool:   Kraken2  https://ccb.jhu.edu/software/kraken2/
 # Mode:   single-end or paired-end (auto-detected from --r2 presence)
@@ -37,7 +37,7 @@ sub new {
         slurm_defaults => {
             queue   => 'qib-short',
             threads => 8,
-            memory  => 64,        # GB fallback — overridden by db-size calc
+            memory  => 64,        # GB fallback - overridden by db-size calc
             runtime => '24:00:00',
         },
 
@@ -53,7 +53,7 @@ sub new {
                 flag     => '-2',
                 type     => 'file',
                 required => 0,
-                help     => 'Reverse reads — omit for single-end mode',
+                help     => 'Reverse reads - omit for single-end mode',
             },
         ],
 
@@ -106,11 +106,11 @@ sub new {
 # Builds the kraken2 invocation.  Handles single-end and paired-end modes.
 #
 # %args keys used here:
-#   r1, r2        — input FASTQ paths (r2 undef for single-end)
-#   db            — database directory
-#   confidence    — confidence threshold
-#   threads       — from slurm_sync
-#   sample        — derived sample name
+#   r1, r2        - input FASTQ paths (r2 undef for single-end)
+#   db            - database directory
+#   confidence    - confidence threshold
+#   threads       - from slurm_sync
+#   sample        - derived sample name
 #
 # Output paths reference $SCRATCH (shell variable, not a Perl variable).
 sub make_command {
@@ -180,7 +180,7 @@ __END__
 
 =head1 NAME
 
-NBI::Launcher::Kraken2 — Taxonomic classification launcher using Kraken2
+NBI::Launcher::Kraken2 - Taxonomic classification launcher using Kraken2
 
 =head1 SYNOPSIS
 
@@ -204,7 +204,7 @@ C</qib/databases/kraken2/standard>.  Thread count is synced from C<--cpus>.
 
 =head2 new()
 
-Construct the Kraken2 launcher spec.  No arguments — all configuration is
+Construct the Kraken2 launcher spec.  No arguments - all configuration is
 embedded in the constructor body.  Returns a blessed C<NBI::Launcher::Kraken2>
 object ready for C<build()>.
 
@@ -216,19 +216,27 @@ Key C<%args> consumed here:
 
 =over 4
 
-=item * B<r1>, B<r2> — input FASTQ paths (C<r2> omitted for single-end)
+=item * B<r1>, B<r2> - input FASTQ paths (C<r2> omitted for single-end)
 
-=item * B<db> — database directory
+=item * B<db> - database directory
 
-=item * B<confidence> — confidence score threshold
+=item * B<confidence> - confidence score threshold
 
-=item * B<threads> — injected from C<--cpus> via C<slurm_sync>
+=item * B<threads> - injected from C<--cpus> via C<slurm_sync>
 
-=item * B<sample> — derived sample name (used for output filenames)
+=item * B<sample> - derived sample name (used for output filenames)
 
 =back
 
 Output files reference C<$SCRATCH> (a shell variable set by the generated
 script) rather than an absolute path.
+
+=head2 build(%args)
+
+Override of L<NBI::Launcher/build> that auto-calculates the Slurm memory
+request from the Kraken2 database folder size before delegating to the base
+class.  The calculation is C<ceil(db_size_gb * 1.4) + 100> GB (40% headroom
+plus a 100 GB fixed overhead).  The auto-calculated value is used only when
+C<--mem> is not explicitly supplied on the command line.
 
 =cut

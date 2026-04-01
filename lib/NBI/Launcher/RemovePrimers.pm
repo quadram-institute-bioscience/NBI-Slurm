@@ -1,7 +1,7 @@
 package NBI::Launcher::RemovePrimers;
 
 # =============================================================================
-# NBI::Launcher::RemovePrimers  —  Primer removal using cutadapt (paired-end)
+# NBI::Launcher::RemovePrimers  -  Primer removal using cutadapt (paired-end)
 #
 # PACKAGED DEMO launcher. To customise for your project, copy to:
 #   ./launchers/remove-primers.pm          (project-local, highest priority)
@@ -13,7 +13,7 @@ package NBI::Launcher::RemovePrimers;
 # Tool:   cutadapt  https://cutadapt.readthedocs.io
 # Mode:   paired-end only
 # Notes:  --discard-untrimmed is hardcoded (drop pairs with no primer found)
-#         Primer reverse complements are computed in Perl — no seqfu needed.
+#         Primer reverse complements are computed in Perl - no seqfu needed.
 #         IUPAC degenerate bases are fully supported in primer sequences.
 # =============================================================================
 
@@ -56,10 +56,10 @@ sub new {
         # Option A (used here): Singularity image.
         #   The path can be overridden at submission time via $CUTADAPT_IMG.
         #
-        # Option B: HPC module — swap the activate block for:
+        # Option B: HPC module - swap the activate block for:
         #   activate => { module => 'cutadapt/3.3' },
         #
-        # Option C: conda — swap for:
+        # Option C: conda - swap for:
         #   activate => { conda => 'cutadapt-env' },
         activate => {
             singularity => $ENV{CUTADAPT_IMG}
@@ -82,7 +82,7 @@ sub new {
                 flag     => '-1',
                 type     => 'file',
                 required => 1,
-                help     => 'Forward reads (R1) FASTQ[.gz] — also used to derive sample name',
+                help     => 'Forward reads (R1) FASTQ[.gz] - also used to derive sample name',
             },
             {   name     => 'r2',
                 flag     => '-2',
@@ -183,7 +183,7 @@ sub make_command {
     my $report  = "\$SCRATCH/$args{sample}.cutadapt.txt";
     my $log     = "\$SCRATCH/$args{sample}.cutadapt.log";
 
-    # Singularity prefix — populated when activate => { singularity => ... }.
+    # Singularity prefix - populated when activate => { singularity => ... }.
     # Empty string when using module or conda activation (handled by the
     # activation_lines() section of the script instead).
     my $img    = $self->{activate}{singularity} // '';
@@ -210,7 +210,7 @@ __END__
 
 =head1 NAME
 
-NBI::Launcher::RemovePrimers — Primer removal from paired-end reads using cutadapt
+NBI::Launcher::RemovePrimers - Primer removal from paired-end reads using cutadapt
 
 =head1 SYNOPSIS
 
@@ -230,7 +230,7 @@ Packaged demo launcher that trims primers from paired-end FASTQ files using
 cutadapt in linked-adapter mode (C<fwd...rev_rc> on R1, C<rev...fwd_rc> on R2).
 Reads without a detectable primer are discarded (C<--discard-untrimmed>).
 
-Primer reverse complements are computed in Perl at submission time — no
+Primer reverse complements are computed in Perl at submission time - no
 C<seqfu> or other runtime dependency needed.  IUPAC degenerate bases are
 fully supported.
 
@@ -243,7 +243,7 @@ C<NBI::Launcher::RemovePrimers> regardless of the file's location.
 
 =head2 new()
 
-Construct the RemovePrimers launcher spec.  No arguments — all configuration
+Construct the RemovePrimers launcher spec.  No arguments - all configuration
 is embedded in the constructor body (activation image, Slurm defaults, inputs,
 params, outputs).  Returns a blessed C<NBI::Launcher::RemovePrimers> object
 ready for C<build()>.
@@ -258,13 +258,13 @@ Key C<%args> consumed here:
 
 =over 4
 
-=item * B<r1>, B<r2> — absolute paths to input FASTQ files
+=item * B<r1>, B<r2> - absolute paths to input FASTQ files
 
-=item * B<fwd_primer>, B<rev_primer> — primer sequences (IUPAC bases supported)
+=item * B<fwd_primer>, B<rev_primer> - primer sequences (IUPAC bases supported)
 
-=item * B<threads> — injected from C<--cpus> via C<slurm_sync>
+=item * B<threads> - injected from C<--cpus> via C<slurm_sync>
 
-=item * B<sample> — derived sample name (used for output filenames)
+=item * B<sample> - derived sample name (used for output filenames)
 
 =back
 
