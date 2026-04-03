@@ -1,5 +1,6 @@
 0.18.0  2026-03-30
 
+* [BUGFIX] Fixed delimiter in lsjobs and viewjobs: jobs with "|" in the name were not correctly parsed
 * nbilaunch: added `--scratch-dir` flag and `scratch=` config key for per-job scratch base path
 * nbilaunch: wildcard queues (e.g. `qib-*`) now auto-resolve to short/medium/long tier based on walltime
 * nbilaunch: script and log filenames now include tool name to avoid collisions across launchers
