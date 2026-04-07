@@ -24,9 +24,8 @@ bibliography: paper.bib
 
 NBI-Slurm is a Perl package that provides a simplified, user-friendly interface for submitting and managing jobs on SLURM [@jette2002slurm] high-performance computing (HPC) clusters.
 It offers both a library of Perl modules for programmatic job management and a suite of command-line tools designed to reduce the cognitive overhead of SLURM's native interface.
-Two distinctive features of NBI-Slurm are TUI applications to view and cancel jobs, and an energy-aware scheduling mode — "eco mode" — that automatically defers flexible jobs
-to off-peak periods,
-helping research institutions reduce their computational carbon footprint without requiring users to manually plan submission times.
+Distinctive features of NBI-Slurm are (a) TUI applications to view and cancel jobs, (b) the possibility to generate tool specific wrappers for (bioinformatic) tools and (c) an energy-aware scheduling mode — "eco mode" — that automatically defers flexible jobs
+to off-peak periods, helping research institutions reduce their computational carbon footprint without requiring users to manually plan submission times.
 
 # Statement of Need
 
@@ -51,7 +50,9 @@ Individual jobs can be selected with `Space` and multiple selected jobs can be c
 
 Energy consumption in research computing is a growing concern [@lannelongue2021green]. Most researchers have no practical mechanism to shift flexible jobs to periods when grid electricity is cheaper or cleaner. NBI-Slurm addresses this directly with a configurable scheduling module that calculates the next available low-energy window and injects a `--begin` directive into the submission, requiring no change to the underlying command.
 
-# Availability and Installation
+# NBI::Slurm package
+
+## Availability and Installation
 
 NBI-Slurm is distributed under the MIT licence and is available from CPAN as `NBI::Slurm`. 
 Installation requires Perl 5.16 or later and can be performed with:
@@ -63,7 +64,7 @@ cpanm NBI::Slurm
 The source code is hosted at <https://github.com/quadram-institute-bioscience/NBI-Slurm> under continuous integration.
 Development has been active since June 2023, and the module is published to the MetaCPAN repository at <https://metacpan.org/dist/NBI-Slurm>.
 
-# Code Structure and Dependencies
+## Code Structure and Dependencies
 
 The package is organised into two layers.
 
@@ -89,7 +90,7 @@ The package is organised into two layers.
 Runtime dependencies are deliberately minimal: `Capture::Tiny` (>=0.40), `JSON::PP`, `Text::ASCIITable` (>=0.22), `Term::ANSIColor`, `Storable`, and `POSIX`—all either part of the Perl core or widely available on CPAN.
 
 
-# Documentation
+## Documentation
 
 Each module is documented with embedded POD (Plain Old Documentation), rendered on CPAN at <https://metacpan.org/dist/NBI-Slurm>.
 Each command-line tool provides a `--help` flag and a manual page generated from its POD. 
@@ -97,7 +98,18 @@ A user guide with annotated examples is maintained in the repository's `README.m
 The test suite (`t/`) covers unit behaviour of every module and integration behaviour of the command-line tools; author-facing tests (`xt/`) verify POD completeness and coverage.
 All tests will be able to check functions even without Slurm. To check the ability to interact with Slurm, there are optional tests that can be executed with `prove -lv xt/hpc-*.t`.
 
-# Example Applications
+
+## Wrappers
+
+NBI-Slurm includes a declarative wrapper framework built around three classes: `NBI::Launcher`, `NBI::Manifest`, and `NBI::Pipeline`.
+A wrapper is a small Perl module that subclasses `NBI::Launcher` and describes a bioinformatics tool — its inputs, parameters, outputs, activation method (HPC module, conda environment, or Singularity image), and SLURM resource defaults — in a single constructor call.
+The only method that subclasses typically need to override is `make_command()`, which returns the tool invocation string; the base class handles input validation, scratch-directory setup, shell script generation, and job submission.
+`NBI::Manifest` serialises all resolved inputs, parameters, outputs, and SLURM resources to a JSON provenance file written alongside the results at submission time, then patched in-place by the job script itself upon completion or failure — with no dependency on external tools such as `jq`.
+Multi-step analyses can be expressed as `NBI::Pipeline` objects that wire `afterok` SLURM dependencies between `NBI::Job` instances automatically.
+The bundled `NBI::Launcher::Kraken2` module illustrates the pattern: it declares paired- or single-end FASTQ inputs, a database directory that defaults to the `KRAKEN2_DB` environment variable, and a `threads` parameter that is automatically synchronised from the `--cpus` SLURM flag; its `build()` override measures the database folder size at submission time and inflates the memory request accordingly (40% headroom plus a 100 GB fixed overhead), ensuring the job is unlikely to be killed by the out-of-memory handler without requiring the user to perform any calculation.
+Third-party wrappers can be placed in `~/.nbi/launchers/` and are discovered automatically by the `nbilaunch` command-line tool.
+
+## Example commands
 
 **Submitting a parallel job.** A researcher wishing to run a genome assembler with 18 cores, 64 GB RAM, and a 12-hour wall-time can write:
 
@@ -151,6 +163,7 @@ my $job2  = NBI::Job->new(
 $job2->opts->dependencies([$id]);
 $job2->run();
 ```
+
 
 # Acknowledgements
 
