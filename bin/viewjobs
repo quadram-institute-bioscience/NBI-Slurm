@@ -158,7 +158,8 @@ my $state = {
     # File viewer mode
     file_view_lines  => [],
     file_view_scroll => 0,
-    file_view_title  => '',
+    file_view_title  => '',   # short label shown on header line 1
+    file_view_path   => '',   # full file path shown on header line 2
 
     # Completed-job tracking (persists across refreshes)
     completed_jobs => {},   # JOBID => job hashref (STATE forced to COMPLETED)
@@ -1009,23 +1010,21 @@ sub handle_detail_input {
     }
     # File viewer shortcuts
     elsif ($key eq 'e' || $key eq 'E') {
-        open_file_view($state, $state->{detail_stderr},
-            "StdErr · $state->{detail_stderr}", 1);
+        open_file_view($state, $state->{detail_stderr}, 'StdErr', 1);
     } elsif ($key eq 'o' || $key eq 'O') {
-        open_file_view($state, $state->{detail_stdout},
-            "StdOut · $state->{detail_stdout}", 1);
+        open_file_view($state, $state->{detail_stdout}, 'StdOut', 1);
     } elsif ($key eq 's' || $key eq 'S') {
-        open_file_view($state, $state->{detail_script},
-            "Script · $state->{detail_script}", 0);
+        open_file_view($state, $state->{detail_script}, 'Script', 0);
     }
 }
 
 # ── File viewer ───────────────────────────────────────────────────────────────
 
-# Open a file in the scrollable viewer.  $start_at_end=1 → start at the last
-# screenful (useful for log files); 0 → start at the top (scripts).
+# Open a file in the scrollable viewer.
+#   $label        = short type label shown on header line 1 (e.g. "StdErr")
+#   $start_at_end = 1 → start at last screenful (logs); 0 → top (scripts)
 sub open_file_view {
-    my ($state, $path, $title, $start_at_end) = @_;
+    my ($state, $path, $label, $start_at_end) = @_;
 
     unless (defined $path && $path ne '') {
         $state->{message} = "No file path available";
@@ -1045,7 +1044,9 @@ sub open_file_view {
     chomp for @lines;
     s/\t/    /g for @lines;   # expand tabs for display
 
-    my $visible = $state->{term_height} - 2;
+    # Two header rows: label + path line
+    my $header_rows = 2;
+    my $visible = $state->{term_height} - $header_rows - 1;   # -1 for footer
     my $scroll  = 0;
     if ($start_at_end && @lines > $visible) {
         $scroll = scalar(@lines) - $visible;
@@ -1054,7 +1055,8 @@ sub open_file_view {
 
     $state->{file_view_lines}  = \@lines;
     $state->{file_view_scroll} = $scroll;
-    $state->{file_view_title}  = $title;
+    $state->{file_view_title}  = $label;
+    $state->{file_view_path}   = $path;
     $state->{mode}             = 'file_view';
 }
 
@@ -1071,16 +1073,25 @@ sub render_file_view_screen {
 
 sub render_file_view_header {
     my $state = shift;
-    my $title = "  \x{1F4C4} " . $state->{file_view_title};
+
+    # Line 1: label (e.g. "StdErr")
+    my $line1 = "  \x{1F4C4} " . $state->{file_view_title};
     print $COLORS->{header}
-        . sprintf("%-*s", $state->{term_width}, substr($title, 0, $state->{term_width}))
+        . sprintf("%-*s", $state->{term_width}, substr($line1, 0, $state->{term_width}))
+        . $COLORS->{reset} . "\r\n";
+
+    # Line 2: full file path (dim/normal color so it stands apart from the header)
+    my $path  = $state->{file_view_path};
+    my $line2 = "  $path";
+    print $COLORS->{normal}
+        . sprintf("%-*s", $state->{term_width}, substr($line2, 0, $state->{term_width}))
         . $COLORS->{reset} . "\r\n";
 }
 
 sub render_file_view_body {
     my $state   = shift;
     my $lines   = $state->{file_view_lines};
-    my $visible = $state->{term_height} - 2;
+    my $visible = $state->{term_height} - 3;   # 2 header rows + 1 footer
 
     for my $ri (0 .. $visible - 1) {
         my $li   = $state->{file_view_scroll} + $ri;
@@ -1102,7 +1113,7 @@ sub render_file_view_body {
 sub render_file_view_footer {
     my $state = shift;
     my $total = scalar @{$state->{file_view_lines}};
-    my $vis   = $state->{term_height} - 2;
+    my $vis   = $state->{term_height} - 3;   # 2 header rows + 1 footer
     my $from  = $state->{file_view_scroll} + 1;
     my $to    = min($state->{file_view_scroll} + $vis, $total);
     $from     = min($from, $total) if $total > 0;
@@ -1117,7 +1128,7 @@ sub render_file_view_footer {
 sub handle_file_view_input {
     my ($state, $key) = @_;
     my $total = scalar @{$state->{file_view_lines}};
-    my $vis   = $state->{term_height} - 2;
+    my $vis   = $state->{term_height} - 3;   # 2 header rows + 1 footer
 
     if ($key eq 'ESC' || $key eq 'q' || $key eq 'Q' || $key eq 'CTRL_C') {
         $state->{mode} = 'detail';
