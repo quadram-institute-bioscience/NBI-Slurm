@@ -31,7 +31,7 @@ use base qw(Exporter);
 our @ISA = qw(Exporter);
 our @EXPORT = qw(Job Opts load_config has_squeue timelog execute_command %FORMAT_STRINGS);
 
-$NBI::Slurm::VERSION = '0.20.0';
+$NBI::Slurm::VERSION = '0.20.1';
 
 
 
