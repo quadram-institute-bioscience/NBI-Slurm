@@ -40,6 +40,7 @@ my $name;
 my $email_address = $config->{'email'} // undef;
 my $mail_type = $config->{'email_type'} // "none";
 my $opt_placeholder = $config->{'placeholder'} // "#FILE#";
+my $params_array_file;
 my $command;
 my $verbose;
 my $debug;
@@ -52,7 +53,7 @@ GetOptions(
     'm|memory=s'    => \$memory,
     'c|cores|threads=i' => \$threads,
     'q|queue=s'     => \$queue,
-    'T|t|time=s'      => \$time,
+    'T|time=s'      => \$time,
     'w|tmpdir=s'    => \$tmpdir,
     'n|name=s'      => \$name,
     'r|run'         => \$run,
@@ -60,6 +61,7 @@ GetOptions(
     'e|mail-type=s' => \$mail_type, # 'BEGIN,END,FAIL,REQUEUE,ALL'
     'after=s'       => \@afterok,
     'f|files=s'       => \my @files,
+    'p|params-array=s' => \$params_array_file,
     'placeholder=s' => \$opt_placeholder,
     'gpu'           => \$gpu,
     'option=s'      => \@slurm_options,
@@ -84,8 +86,14 @@ my $time_hours = NBI::Opts::_time_to_hour($time);
 $queue = update_queue($queue, $time_hours);
 $command = join(" ", @ARGV);
 usage(1) unless ($command);
- 
+
+if (@files and defined $params_array_file) {
+    say STDERR RED, BOLD, "ERROR:", RESET, " --files and --params-array are mutually exclusive";
+    exit 1;
+}
+
 my @abs_files = get_abs_files(@files);
+my ($params_array_abs, $params_rows) = get_params_array_info($params_array_file, $command);
 
 
 if ($verbose) {
@@ -97,6 +105,7 @@ if ($verbose) {
     say STDERR YELLOW, "Tmpdir:     ", RESET, $tmpdir // "(not set)";
     say STDERR YELLOW, "Name:       ", RESET, $name // "(not set)";
     say STDERR YELLOW, "Command:    ", RESET, $command // "(not set)";
+    say STDERR YELLOW, "Params TSV: ", RESET, $params_array_abs if defined $params_array_abs;
 }
 # Check threadshours
 if (-d $time) {
@@ -171,6 +180,8 @@ my $opts = NBI::Opts->new(
     -email_type => $mail_type,
     -opts => \@additional_opts,
     -files => \@abs_files,
+    -params_array => $params_array_abs,
+    -params_rows => $params_rows,
     -placeholder => $opt_placeholder,
 );
 
@@ -286,7 +297,11 @@ sub usage {
     -r, --run        Run the job (otherwise, just print the script)
     -f, --files      Input files for array (either specify -f as many times as needed or
                      use a _quoted_ pattern like "*.fasta" to include multiple files)
+    -p, --params-array
+                     TSV file for array jobs; refer to columns as ##1##, ##2##, ...
+                     Mutually exclusive with --files
     --placeholder    Placeholder for array input files [default: #FILE#]
+                     Ignored when --params-array is used
     --gpu            Request GPU resources (adds --gres=gpu:1)
     --option VALUE   Additional SLURM options (can be used multiple times)
     --eco            Schedule job in next low-energy window (overrides eco_default=0)
@@ -381,6 +396,57 @@ sub get_abs_files {
     }
     return @abs_files;
 }
+
+sub get_params_array_info {
+    my ($file, $command) = @_;
+    return (undef, 0) unless defined $file;
+
+    unless (-e $file) {
+        say STDERR RED, BOLD, "ERROR:", RESET, " $file does not exist!";
+        exit 1;
+    }
+
+    my $abs_file = abs_path($file);
+    open(my $fh, "<", $abs_file) or do {
+        say STDERR RED, BOLD, "ERROR:", RESET, " Cannot read $abs_file: $!";
+        exit 1;
+    };
+
+    my %placeholders;
+    while ($command =~ /##(\d+)##/g) {
+        $placeholders{$1} = 1;
+    }
+    my $max_placeholder = 0;
+    for my $n (keys %placeholders) {
+        $max_placeholder = $n if $n > $max_placeholder;
+    }
+    if ($max_placeholder == 0) {
+        say STDERR RED, BOLD, "ERROR:", RESET, " --params-array requires placeholders like ##1## in the command";
+        exit 1;
+    }
+
+    my $rows = 0;
+    while (my $line = <$fh>) {
+        chomp $line;
+        $line =~ s/\r$//;
+        next if $line =~ /^\s*$/;
+        next if $line =~ /^\s*#/;
+        my @fields = split /\t/, $line, -1;
+        if (scalar(@fields) < $max_placeholder) {
+            say STDERR RED, BOLD, "ERROR:", RESET, " $abs_file row ", ($rows + 1), " has ", scalar(@fields), " columns but the command requires ##$max_placeholder##";
+            exit 1;
+        }
+        $rows++;
+    }
+    close $fh;
+
+    if ($rows == 0) {
+        say STDERR RED, BOLD, "ERROR:", RESET, " $abs_file does not contain any usable TSV rows";
+        exit 1;
+    }
+
+    return ($abs_file, $rows);
+}
 __END__
 =pod
 
@@ -435,10 +501,19 @@ Specifies the temporary (working) directory for the job. The default value is "/
 Specifies input files or file patterns for the job. This option can be used multiple times.
 You can use quoted patterns like "*.fasta" to include multiple files matching the pattern.
 
+=item B<-p, --params-array> FILE
+
+Specifies a TSV file to drive a SLURM array job. Each non-empty, non-comment row
+becomes one array task, and columns are exposed in the command as placeholders like
+C<##1##>, C<##2##>, and C<##3##>.
+
+Mutually exclusive with C<--files>.
+
 =item B<--placeholder> STR [default: C<#FILE#>]
 
 Specifies a placeholder string to be used in the command for input files. 
-If not provided, the default placeholder is "#FILE#".
+If not provided, the default placeholder is "#FILE#". Ignored when using
+C<--params-array>.
 
 =item B<-a, --email-address> STR
 

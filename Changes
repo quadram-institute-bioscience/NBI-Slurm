@@ -1,3 +1,7 @@
+0.21.0	2026-04-23
+
+* Added --params-file in 'runjob'
+
 0.20.1	2026-04-22
 
 * Fixed sorting in 'viewjobs'
