@@ -53,7 +53,7 @@ sub _yell {
 }
 sub new {
     my $class = shift @_;
-    my ($queue, $memory, $threads, $opts_array, $tmpdir, $hours, $email_address, $email_when, $files, $placeholder, $start_time, $start_date, $params_array, $params_rows) = (undef) x 14;
+    my ($queue, $memory, $threads, $opts_array, $tmpdir, $hours, $email_address, $email_when, $files, $placeholder, $start_time, $start_date, $params_array, $params_rows, $array_offset, $array_tasks) = (undef) x 16;
     
     # Descriptive instantiation with parameters -param => value
     if (substr($_[0], 0, 1) eq '-') {
@@ -149,6 +149,24 @@ sub new {
                 } else {
                     confess "ERROR NBI::Seq: -params_rows expects an integer\n";
                 }
+
+            # ARRAY OFFSET
+            } elsif ($i =~ /^-array_offset/) {
+                next unless defined $data{$i};
+                if ($data{$i} =~ /^\d+$/) {
+                    $array_offset = $data{$i};
+                } else {
+                    confess "ERROR NBI::Seq: -array_offset expects an integer\n";
+                }
+
+            # ARRAY TASK COUNT
+            } elsif ($i =~ /^-array_tasks/) {
+                next unless defined $data{$i};
+                if ($data{$i} =~ /^\d+$/) {
+                    $array_tasks = $data{$i};
+                } else {
+                    confess "ERROR NBI::Seq: -array_tasks expects an integer\n";
+                }
                 
             # START TIME
             } elsif ($i =~ /^-start_time/) {
@@ -180,6 +198,8 @@ sub new {
     $self->placeholder = defined $placeholder ?  $placeholder : "#FILE#";
     $self->params_array = defined $params_array ? $params_array : undef;
     $self->params_rows = defined $params_rows ? $params_rows : 0;
+    $self->{array_offset} = defined $array_offset ? $array_offset : 0;
+    $self->{array_tasks} = defined $array_tasks ? $array_tasks : 0;
     # Set options
     $self->opts = defined $$opts_array[0] ? $opts_array : [];
     # Begin time (optional)
@@ -370,7 +390,8 @@ sub header {
 
     # Job array
     if ($self->is_array()) {
-        my $len = $self->array_size() - 1;
+        my $tasks = $self->{array_tasks} > 0 ? $self->{array_tasks} : $self->array_size();
+        my $len = $tasks - 1;
         $str .= "#SBATCH --array=0-$len\n";
     }
     # Begin time

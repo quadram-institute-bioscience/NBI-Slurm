@@ -94,6 +94,9 @@ if (@files and defined $params_array_file) {
 
 my @abs_files = get_abs_files(@files);
 my ($params_array_abs, $params_rows) = get_params_array_info($params_array_file, $command);
+my $total_array_tasks = @abs_files ? scalar(@abs_files) : $params_rows;
+my $array_task_limit = get_array_task_limit($config);
+my @array_chunks = build_array_chunks($total_array_tasks, $array_task_limit);
 
 
 if ($verbose) {
@@ -106,6 +109,8 @@ if ($verbose) {
     say STDERR YELLOW, "Name:       ", RESET, $name // "(not set)";
     say STDERR YELLOW, "Command:    ", RESET, $command // "(not set)";
     say STDERR YELLOW, "Params TSV: ", RESET, $params_array_abs if defined $params_array_abs;
+    say STDERR YELLOW, "Array size: ", RESET, $total_array_tasks if $total_array_tasks;
+    say STDERR YELLOW, "Array cap:  ", RESET, $array_task_limit if defined $array_task_limit;
 }
 # Check threadshours
 if (-d $time) {
@@ -170,22 +175,6 @@ if (not NBI::Slurm::valid_queue($queue)) {
     
 }
 
-my $opts = NBI::Opts->new(
-    -queue => $queue,
-    -threads => $threads,
-    -memory => $memory,
-    -time   => $time,
-    -tmpdir => $tmpdir,
-    -email_address => $email_address,
-    -email_type => $mail_type,
-    -opts => \@additional_opts,
-    -files => \@abs_files,
-    -params_array => $params_array_abs,
-    -params_rows => $params_rows,
-    -placeholder => $opt_placeholder,
-);
-
-
 # Eco scheduling
 # eco_default from config defaults to 1 (on) if not explicitly set
 my $eco_default = defined $config->{eco_default} ? $config->{eco_default} : $NBI::EcoScheduler::DEFAULTS{eco_default};
@@ -194,33 +183,10 @@ my $use_eco = $opt_no_eco ? 0
             :               $eco_default;
 
 if ($use_eco) {
-    if (defined $opts->{start_time} || defined $opts->{start_date}) {
+    if (defined $config->{start_time} || defined $config->{start_date}) {
         say STDERR YELLOW, "[eco] --begin already set explicitly, ignoring eco scheduling", RESET;
-    } else {
-        my ($begin_epoch, $tier) = NBI::EcoScheduler::find_eco_begin($opts->hours, $config);
-        if (defined $begin_epoch) {
-            my $begin_str = NBI::EcoScheduler::epoch_to_slurm($begin_epoch);
-            my $delay     = NBI::EcoScheduler::format_delay($begin_epoch);
-            # Store directly since the parsers accept already-normalised YYYY-MM-DD / HH:MM:SS
-            ($opts->{start_date}, $opts->{start_time}) = split /T/, $begin_str;
-            my $tier_warn = $tier == 2 ? " (job may overrun eco window)"
-                          : $tier == 3 ? " (job may overlap peak hours — best available)"
-                          :              "";
-            say STDERR GREEN, "[eco] Job scheduled for $begin_str (in $delay)$tier_warn", RESET;
-        } else {
-            say STDERR YELLOW, "[eco] No eco slot found in lookahead period, submitting immediately", RESET;
-        }
     }
 }
-
-if ($verbose) {
-    say STDERR GREEN, "CONFIG:\n", RESET;
-    xdump($config);
-    print STDERR "\n";
-    #say STDERR GREEN, "OPTS:\n", RESET;
-    say STDERR $opts->view();
-}
-
 
 sub xdump {
     my ($hash_of_hashes, $indent) = @_;
@@ -237,51 +203,118 @@ sub xdump {
 }
 
 
-# If the command starts with a number, it might be a typo like -t 8h instead
-my $job = NBI::Job->new(
-    -name => $name,
-    -command =>  "cd \"$user_current_dir\"",
-    -opts => $opts,
-);
-if ($debug) {
-    say STDERR YELLOW, "JOB:\n", RESET, Dumper($job);
+if (@array_chunks > 1) {
+    say STDERR YELLOW, "[array] Splitting $total_array_tasks tasks into ", scalar(@array_chunks), " jobs", RESET;
 }
-$job->append_command($command);
-if ($verbose and not $run) {
-    say STDERR GREEN, "JOB SCRIPT\n", RESET;
-    say STDERR $job->script();
+
+my @jobs;
+my $name_width = scalar(@array_chunks) > 1 ? length(scalar(@array_chunks)) : 0;
+for my $chunk_idx (0 .. $#array_chunks) {
+    my ($array_offset, $chunk_tasks) = @{$array_chunks[$chunk_idx]};
+    my @job_files = @abs_files;
+    my $job_params_array = $params_array_abs;
+    my $job_params_rows = $params_rows;
+    my $job_array_offset = 0;
+
+    if (@abs_files && @array_chunks > 1) {
+        @job_files = @abs_files[$array_offset .. ($array_offset + $chunk_tasks - 1)];
+    } elsif (defined $params_array_abs) {
+        $job_array_offset = $array_offset;
+    }
+
+    my $job_name = $name;
+    if (@array_chunks > 1) {
+        $job_name = sprintf("%s.part%0*d", $name, $name_width, $chunk_idx + 1);
+    }
+
+    my $opts = NBI::Opts->new(
+        -queue => $queue,
+        -threads => $threads,
+        -memory => $memory,
+        -time   => $time,
+        -tmpdir => $tmpdir,
+        -email_address => $email_address,
+        -email_type => $mail_type,
+        -opts => \@additional_opts,
+        -files => \@job_files,
+        -params_array => $job_params_array,
+        -params_rows => $job_params_rows,
+        -placeholder => $opt_placeholder,
+        -array_offset => $job_array_offset,
+        -array_tasks => $chunk_tasks,
+    );
+
+    if ($use_eco) {
+        my ($begin_epoch, $tier) = NBI::EcoScheduler::find_eco_begin($opts->hours, $config);
+        if (defined $begin_epoch) {
+            my $begin_str = NBI::EcoScheduler::epoch_to_slurm($begin_epoch);
+            my $delay     = NBI::EcoScheduler::format_delay($begin_epoch);
+            ($opts->{start_date}, $opts->{start_time}) = split /T/, $begin_str;
+            my $tier_warn = $tier == 2 ? " (job may overrun eco window)"
+                          : $tier == 3 ? " (job may overlap peak hours — best available)"
+                          :              "";
+            say STDERR GREEN, "[eco] Job scheduled for $begin_str (in $delay)$tier_warn", RESET if $chunk_idx == 0;
+        } else {
+            say STDERR YELLOW, "[eco] No eco slot found in lookahead period, submitting immediately", RESET if $chunk_idx == 0;
+        }
+    }
+
+    if ($verbose) {
+        say STDERR GREEN, "CONFIG:\n", RESET if $chunk_idx == 0;
+        xdump($config) if $chunk_idx == 0;
+        print STDERR "\n" if $chunk_idx == 0;
+        say STDERR $opts->view();
+    }
+
+    my $job = NBI::Job->new(
+        -name => $job_name,
+        -command =>  "cd \"$user_current_dir\"",
+        -opts => $opts,
+    );
+    if ($debug) {
+        say STDERR YELLOW, "JOB:\n", RESET, Dumper($job);
+    }
+    $job->append_command($command);
+    push @jobs, $job;
 }
 
 
 my $err = 0;
 if ($run) {
-    
-    if (my $j = $job->run()) {
-        
-        if ($verbose) {
-            #say STDERR GREEN, "JOB OBJECT:\n", RESET;
-            say STDERR $job->view();
+    my @job_ids;
+    for my $job (@jobs) {
+        my $j = $job->run();
+        if ($j) {
+            if ($verbose) {
+                say STDERR $job->view();
+            }
+            push @job_ids, $j;
+        } else {
+            say STDERR RED, "Job not submitted: $j", RESET;
+            if ($verbose) {
+                say STDERR $job->view();
+            }
+            $err = 1;
+            last;
         }
-
-        say "$j";
-    } else {
-        say STDERR RED, "Job not submitted: $j", RESET;
-        if ($verbose) {
-            #say STDERR RED, "JOB OBJECT:\n", RESET;
-            say STDERR $job->view();
-        }
-        $err = 1;
+    }
+    if (!$err) {
+        say $_ for @job_ids;
     }
 } else {
-    say STDERR GREEN, "JOB SCRIPT:\n", RESET;
-    say $job->script();
+    for my $idx (0 .. $#jobs) {
+        say STDERR GREEN, "JOB SCRIPT\n", RESET if @jobs == 1;
+        say STDERR GREEN, "JOB SCRIPT ", ($idx + 1), "/", scalar(@jobs), "\n", RESET if @jobs > 1;
+        say $jobs[$idx]->script();
+    }
 }
 
 
 if ($err) {
     exit 1;
-} else {
-    say STDERR GREEN, "Job sumbitted: ", $job->jobid, RESET, "\t(", $job->name, ")", RESET;
+} elsif ($run) {
+    my @submitted = map { $_->jobid } @jobs;
+    say STDERR GREEN, "Jobs submitted: ", join(",", @submitted), RESET;
 }
 sub usage {
     say STDERR <<END;
@@ -446,6 +479,50 @@ sub get_params_array_info {
     }
 
     return ($abs_file, $rows);
+}
+
+sub build_array_chunks {
+    my ($total_tasks, $task_limit) = @_;
+    return ([0, 0]) unless $total_tasks;
+    return ([0, $total_tasks]) unless defined $task_limit && $task_limit > 0 && $total_tasks > $task_limit;
+
+    my @chunks;
+    for (my $offset = 0; $offset < $total_tasks; $offset += $task_limit) {
+        my $chunk_tasks = $task_limit;
+        my $remaining = $total_tasks - $offset;
+        $chunk_tasks = $remaining if $remaining < $chunk_tasks;
+        push @chunks, [$offset, $chunk_tasks];
+    }
+    return @chunks;
+}
+
+sub get_array_task_limit {
+    my ($config) = @_;
+
+    if (defined $ENV{NBI_MAX_ARRAY_SIZE} && $ENV{NBI_MAX_ARRAY_SIZE} =~ /^\d+$/ && $ENV{NBI_MAX_ARRAY_SIZE} > 0) {
+        return $ENV{NBI_MAX_ARRAY_SIZE};
+    }
+    if (defined $config->{max_array_size} && $config->{max_array_size} =~ /^\d+$/ && $config->{max_array_size} > 0) {
+        return $config->{max_array_size};
+    }
+
+    my $output = `scontrol show config 2>/dev/null`;
+    return undef if $? != 0 || !$output;
+
+    my @limits;
+    if ($output =~ /^MaxArraySize\s*=\s*(\d+)/m) {
+        push @limits, $1 if $1 > 0;
+    }
+    if ($output =~ /max_array_tasks=(\d+)/) {
+        push @limits, $1 if $1 > 0;
+    }
+    return undef unless @limits;
+
+    my $limit = shift @limits;
+    for my $candidate (@limits) {
+        $limit = $candidate if $candidate < $limit;
+    }
+    return $limit;
 }
 __END__
 =pod

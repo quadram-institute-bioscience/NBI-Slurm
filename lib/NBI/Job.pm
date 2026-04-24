@@ -315,6 +315,10 @@ sub _replace_array_placeholders {
 
 sub _array_prelude {
     my ($self) = @_;
+    my @index_prelude = ('nbi_array_index=$SLURM_ARRAY_TASK_ID');
+    if ($self->opts->{array_offset} && $self->opts->{array_offset} > 0) {
+        @index_prelude = ("nbi_array_index=\$((SLURM_ARRAY_TASK_ID + " . $self->opts->{array_offset} . "))");
+    }
     if ($self->opts->is_files_array()) {
         my $self_files = $self->opts->files;
         my @escaped_files = @{$self_files};
@@ -324,8 +328,9 @@ sub _array_prelude {
         my $files_list = join(" ", @escaped_files);
         return (
             "# Job array list",
+            @index_prelude,
             "self_files=($files_list)",
-            "selected_file=\${self_files[\$SLURM_ARRAY_TASK_ID]}",
+            "selected_file=\${self_files[\$nbi_array_index]}",
         );
     }
     if ($self->opts->is_params_array()) {
@@ -333,8 +338,9 @@ sub _array_prelude {
         my $perl_loader = q{use strict;use warnings;my ($file,$task_id)=@ARGV;open my $fh,"<",$file or die "Cannot open $file: $!\n";my $row_idx=0;while (my $line=<$fh>) { chomp $line; $line =~ s/\r$//; next if $line =~ /^\s*$/; next if $line =~ /^\s*#/; if ($row_idx == $task_id) { my @fields = split /\t/, $line, -1; for my $field (@fields) { print $field, "\0"; } exit 0; } $row_idx++; } die "No params row for task_id=$task_id in $file\n";};
         return (
             "# Job array params",
+            @index_prelude,
             "params_file=$params_file",
-            "mapfile -d '' -t params < <(perl -e '$perl_loader' \"\$params_file\" \"\$SLURM_ARRAY_TASK_ID\")",
+            "mapfile -d '' -t params < <(perl -e '$perl_loader' \"\$params_file\" \"\$nbi_array_index\")",
             "for i in \"\${!params[@]}\"; do",
             "    printf -v \"param_\$((i + 1))\" '%s' \"\${params[\$i]}\"",
             "done",

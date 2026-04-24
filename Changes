@@ -1,6 +1,7 @@
-0.21.0	2026-04-23
+0.21.0	2026-04-24
 
-* Added --params-file in 'runjob'
+* Added 'slurm-status'
+* Improved array support
 
 0.20.1	2026-04-22
 
